@@ -32,6 +32,8 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine, get_db
+from app.db.session import engine, get_db, SessionLocal
+from app.services.categorizer import categorizer
 
 # Importa os modelos para garantir que TODOS estejam registrados no
 # `Base.metadata` antes do `create_all` no startup. Sem isso, o
@@ -55,6 +57,19 @@ async def lifespan(app: FastAPI):
     # Cria as tabelas no banco se ainda não existirem (idempotente).
     Base.metadata.create_all(bind=engine)
     print(f"[startup] Tabelas garantidas no banco: {list(Base.metadata.tables.keys())}")
+        
+     # Treina a IA com os dados atuais do banco
+    print("[startup] Treinando modelo de IA...")
+    db = SessionLocal()
+    try:
+        treinado = categorizer.train(db)
+        if treinado:
+            print("[startup] Modelo de IA treinado e pronto.")
+        else:
+            print("[startup] Dados insuficientes para treinar a IA ainda.")
+    finally:
+        db.close()
+
     print(f"[startup] {settings.APP_NAME} pronto em /api/v1")
     yield
     # === SHUTDOWN === (nada a fazer por ora)

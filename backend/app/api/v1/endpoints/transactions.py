@@ -36,7 +36,10 @@ from app.schemas.transaction import (
     TransactionCreate,
     TransactionRead,
     TransactionUpdate,
+    TransactionPredictPayload,
+    TransactionPredictResult,
 )
+from app.services.categorizer import categorizer 
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -200,4 +203,20 @@ def delete_transaction(
             detail=f"Transação com id={transaction_id} não encontrada.",
         )
     crud_transaction.delete(db, tx)
+    
+    # ---------------------------------------------------------------------------
+# POST /transactions/predict-category — predição de IA
+# ---------------------------------------------------------------------------
+@router.post(
+    "/predict-category",
+    response_model=TransactionPredictResult,
+    summary="Sugerir categoria via IA",
+)
+def predict_category(payload: TransactionPredictPayload) -> TransactionPredictResult:
+    """
+    Recebe uma descrição (ex: "Uber para o trabalho") e tenta prever 
+    a categoria baseada no histórico de transações.
+    """
+    category_id = categorizer.predict(payload.description)
+    return TransactionPredictResult(category_id=category_id)
     

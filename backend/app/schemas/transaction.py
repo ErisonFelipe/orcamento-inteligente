@@ -54,3 +54,13 @@ class TransactionRead(TransactionBase):
     category: CategoryRead | None = None
 
     model_config = ConfigDict(from_attributes=True)
+    
+
+class TransactionPredictPayload(BaseModel):
+    """Payload para pedir uma sugestão de categoria."""
+    description: str = Field(min_length=1, max_length=255)
+
+
+class TransactionPredictResult(BaseModel):
+    """Resposta da IA com o ID da categoria sugerida."""
+    category_id: int | None
