@@ -1,23 +1,3 @@
-/**
- * Cliente HTTP centralizado do frontend.
- *
- * Toda chamada ao backend passa por aqui. Componentes e hooks NUNCA devem
- * chamar `axios` ou `fetch` diretamente — sempre usar `transactionsApi`
- * (e, nas próximas etapas, `categoriesApi`, `budgetsApi`, etc.).
- *
- * Por que centralizar:
- *
- * - `baseURL`, `timeout` e headers comuns em um só lugar.
- * - Todo erro HTTP vira `ApiError` com mensagem amigável pronta para UI.
- *   (FastAPI devolve `{"detail": ...}`; o interceptor extrai e formata.)
- * - Testável: dá para mockar `transactionsApi.list` nos testes.
- *
- * Variável de ambiente:
- *   Em dev, `API_BASE_URL` aponta para o backend local (8000).
- *   Em deploy (Etapa 8), será configurada via `.env` do Vite
- *   (`import.meta.env.VITE_API_URL`).
- */
-
 import axios, { AxiosError } from "axios"
 
 import type {
@@ -26,25 +6,21 @@ import type {
   TransactionListResult,
   TransactionRead,
   TransactionUpdate,
+  TransactionPredictResult,
+  TransactionBulkCreate,
 } from "@/types/transaction"
+import type {
+  CategoryCreate,
+  CategoryRead,
+  CategoryUpdate,
+} from "@/types/category"
+import type { DashboardSummary, AnnualWealthSummary } from "@/types/dashboard"
+import type { InvestmentCreate, InvestmentListResult, InvestmentRead, InvestmentUpdate, InvestmentBulkCreate } from "@/types/investment"
 
-// ============================================================
-// Configuração base
-// ============================================================
+const API_BASE_URL = "/api/v1"
 
-const API_BASE_URL = "http://localhost:8000/api/v1"
-
-/**
- * Erro customizado para chamadas de API.
- *
- * Todo erro (HTTP ou de rede) que escapar das funções `transactionsApi.*`
- * será deste tipo. Isso permite que hooks e componentes tratem erro de forma
- * consistente (`err.message` para UI, `err.status` para decidir retry, etc.).
- */
 export class ApiError extends Error {
-  /** Código HTTP (0 = erro de rede / sem resposta). */
   readonly status: number
-  /** Corpo de erro do backend (ex.: `{ detail: "..." }` ou lista de erros 422). */
   readonly detail: unknown
 
   constructor(message: string, status: number, detail: unknown = null) {
@@ -57,18 +33,13 @@ export class ApiError extends Error {
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10_000, // 10 segundos
+  timeout: 10_000,
   headers: { "Content-Type": "application/json" },
 })
-
-// ============================================================
-// Interceptor de resposta: converte AxiosError em ApiError
-// ============================================================
 
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    // Erro de rede (backend fora, DNS, timeout, CORS mal configurado)
     if (!error.response) {
       return Promise.reject(
         new ApiError("Sem conexão com o servidor. Verifique se o backend está rodando.", 0),
@@ -80,10 +51,8 @@ api.interceptors.response.use(
 
     let message: string
     if (typeof detail === "string") {
-      // FastAPI devolve {"detail": "mensagem"} para erros simples (404, 400)
       message = detail
     } else if (Array.isArray(detail)) {
-      // FastAPI devolve {"detail": [{loc, msg, ...}, ...]} para 422 (validação)
       message = detail
         .map((e: { loc?: unknown; msg?: string }) => {
           const campo = Array.isArray(e.loc) ? e.loc.slice(1).join(".") : ""
@@ -111,15 +80,10 @@ function defaultMessageFor(status: number): string {
 }
 
 // ============================================================
-// API de transações
+// API de Transações
 // ============================================================
 
 export const transactionsApi = {
-  /**
-   * Lista transações com filtros opcionais.
-   * O backend devolve o array no corpo e o total no cabeçalho
-   * `X-Total-Count` — combinamos os dois em `TransactionListResult`.
-   */
   async list(filters: TransactionFilters = {}): Promise<TransactionListResult> {
     const response = await api.get<TransactionRead[]>("/transactions", {
       params: filters,
@@ -129,37 +93,116 @@ export const transactionsApi = {
     return { items: response.data, total }
   },
 
-  /** Busca uma transação por ID. Lança `ApiError(404)` se não existir. */
   async get(id: number): Promise<TransactionRead> {
     const response = await api.get<TransactionRead>(`/transactions/${id}`)
     return response.data
   },
 
-  /** Cria uma nova transação. */
   async create(payload: TransactionCreate): Promise<TransactionRead> {
     const response = await api.post<TransactionRead>("/transactions", payload)
     return response.data
   },
 
-  /** Atualiza APENAS os campos enviados (PATCH parcial). */
   async update(id: number, payload: TransactionUpdate): Promise<TransactionRead> {
     const response = await api.patch<TransactionRead>(`/transactions/${id}`, payload)
     return response.data
   },
 
-  /** Remove uma transação. */
   async delete(id: number): Promise<void> {
     await api.delete(`/transactions/${id}`)
+  },
+
+  async predictCategory(description: string): Promise<TransactionPredictResult> {
+    const response = await api.post<TransactionPredictResult>(
+      "/transactions/predict-category",
+      { description }
+    )
+    return response.data
+  },
+
+  async createBulk(payload: TransactionBulkCreate): Promise<TransactionRead[]> {
+    const response = await api.post<TransactionRead[]>("/transactions/bulk", payload)
+    return response.data
   },
 }
 
 // ============================================================
-// Exposição em dev para debug pelo console do navegador
+// API de Categorias
 // ============================================================
-// Em desenvolvimento, `window.__api.transactionsApi.list()` funciona no
-// console do navegador. Em produção, este bloco é removido automaticamente
-// (import.meta.env.DEV é `false` no build).
+
+export const categoriesApi = {
+  async list(): Promise<CategoryRead[]> {
+    const response = await api.get<CategoryRead[]>("/categories")
+    return response.data
+  },
+
+  async create(payload: CategoryCreate): Promise<CategoryRead> {
+    const response = await api.post<CategoryRead>("/categories", payload)
+    return response.data
+  },
+
+  async update(id: number, payload: CategoryUpdate): Promise<CategoryRead> {
+    const response = await api.patch<CategoryRead>(`/categories/${id}`, payload)
+    return response.data
+  },
+
+  async delete(id: number): Promise<void> {
+    await api.delete(`/categories/${id}`)
+  },
+}
+
 if (import.meta.env.DEV) {
   // @ts-expect-error - helper só de desenvolvimento
-  window.__api = { transactionsApi }
+  window.__api = { transactionsApi, categoriesApi }
+}
+
+// ============================================================
+// API do Dashboard
+// ============================================================
+
+export const dashboardApi = {
+  async getSummary(): Promise<DashboardSummary> {
+    const response = await api.get<DashboardSummary>("/dashboard/summary")
+    return response.data
+  },
+  
+  async getWealth(year: number): Promise<AnnualWealthSummary> {
+    const response = await api.get<AnnualWealthSummary>("/dashboard/wealth", {
+      params: { year },
+    })
+    return response.data
+  },
+}
+
+export const investmentsApi = {
+  async list(): Promise<InvestmentListResult> {
+    const response = await api.get<InvestmentRead[]>("/investments")
+    const totalHeader = response.headers["x-total-count"]
+    const total = totalHeader ? Number(totalHeader) : response.data.length
+    return { items: response.data, total }
+  },
+
+  async create(payload: InvestmentCreate): Promise<InvestmentRead> {
+    const response = await api.post<InvestmentRead>("/investments", payload)
+    return response.data
+  },
+
+  async update(id: number, payload: InvestmentUpdate): Promise<InvestmentRead> {
+    const response = await api.patch<InvestmentRead>(`/investments/${id}`, payload)
+    return response.data
+  },
+
+  async delete(id: number): Promise<void> {
+    await api.delete(`/investments/${id}`)
+  },
+
+   async createBulk(payload: InvestmentBulkCreate): Promise<InvestmentRead[]> {
+    const response = await api.post<InvestmentRead[]>("/investments/bulk", payload)
+    return response.data
+  },
+}
+
+if (import.meta.env.DEV) {
+  // @ts-expect-error - helper só de desenvolvimento
+  window.__api = { transactionsApi, categoriesApi, dashboardApi, investmentsApi }
 }

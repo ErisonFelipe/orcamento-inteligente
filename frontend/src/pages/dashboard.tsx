@@ -1,5 +1,5 @@
 import { Pie, PieChart, Cell, Bar, BarChart, XAxis, YAxis } from "recharts"
-import { PieChart as PieIcon } from "lucide-react"
+import { PieChart as PieIcon, TrendingUp, AlertTriangle, CalendarClock } from "lucide-react"
 
 import { useDashboardSummary } from "@/hooks/use-dashboard"
 import { formatCurrency } from "@/lib/format"
@@ -20,7 +20,6 @@ import {
 import type { ChartConfig } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Formata "2026-11" para "Nov/26"
 function formatMonthLabel(monthStr: string) {
   const [year, month] = monthStr.split("-")
   const date = new Date(Number(year), Number(month) - 1, 1)
@@ -49,7 +48,6 @@ export function DashboardPage() {
     return <div className="p-8 text-center text-destructive">Erro ao carregar o dashboard.</div>
   }
 
-  // 1. Dados do Gráfico de Pizza
   const pieData = data.expenses_by_category.map((item) => ({
     name: item.name,
     total: Number(item.total),
@@ -61,7 +59,6 @@ export function DashboardPage() {
     return acc
   }, {} as ChartConfig)
 
-  // 2. Dados do Gráfico de Barras
   const barData = data.monthly_summary.map((item) => ({
     month: formatMonthLabel(item.month),
     income: Number(item.income),
@@ -73,18 +70,29 @@ export function DashboardPage() {
     expense: { label: "Despesas", color: "var(--expense)" },
   } satisfies ChartConfig
 
-  // 3. Totais Gerais
   const totalIncome = data.monthly_summary.reduce((acc, curr) => acc + Number(curr.income), 0)
   const totalExpense = data.monthly_summary.reduce((acc, curr) => acc + Number(curr.expense), 0)
 
   const hasExpenses = pieData.length > 0
   const hasMonths = barData.length > 0
+  const forecast = data.forecast
 
   return (
     <div className="space-y-4">
+      
+      {/* BANNER DE ALERTA (Só aparece se o backend mandar uma mensagem) */}
+      {forecast?.alert_message && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-destructive">Atenção financeira</h3>
+            <p className="text-sm text-destructive/90">{forecast.alert_message}</p>
+          </div>
+        </div>
+      )}
+
+      {/* GRID PRINCIPAL (Pizza + Resumo) */}
       <div className="grid gap-4 md:grid-cols-2">
-        
-        {/* GRÁFICO DE PIZZA - DESPESAS POR CATEGORIA */}
         <Card className="flex flex-col">
           <CardHeader className="items-center pb-0">
             <CardTitle>Despesas por Categoria</CardTitle>
@@ -113,6 +121,8 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
+        
+
         {/* RESUMO FINANCEIRO */}
         <Card>
           <CardHeader>
@@ -126,17 +136,61 @@ export function DashboardPage() {
                 + {formatCurrency(totalIncome.toString())}
               </span>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border pb-4">
               <span className="text-sm font-medium text-muted-foreground">Total em Despesas</span>
               <span className="text-lg font-bold text-expense">
                 - {formatCurrency(totalExpense.toString())}
               </span>
             </div>
+            {/* NOVO CAMPO: Total Investido */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Total Investido</span>
+              <span className="text-lg font-bold text-primary">
+                {formatCurrency(data.total_invested)}
+              </span>
+            </div>
           </CardContent>
         </Card>
+
+
       </div>
 
-      {/* GRÁFICO DE BARRAS - EVOLUÇÃO MENSAL */}
+      {/* CARD DE PREVISÃO (NOVO) */}
+      {forecast && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Previsão do Mês
+            </CardTitle>
+            <CardDescription>
+              Baseado no seu ritmo de gastos até o dia {forecast.current_day}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 sm:grid-cols-3">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Média diária de gastos</p>
+              <p className="text-xl font-semibold">{formatCurrency(forecast.daily_average)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Previsão total de despesas</p>
+              <p className="text-xl font-semibold text-expense">
+                - {formatCurrency(forecast.projected_expense)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                <CalendarClock className="h-3 w-3" /> Saldo previsto no fim do mês
+              </p>
+              <p className={`text-xl font-bold ${Number(forecast.projected_balance) < 0 ? "text-destructive" : "text-income"}`}>
+                {formatCurrency(forecast.projected_balance)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* GRÁFICO DE BARRAS */}
       <Card>
         <CardHeader>
           <CardTitle>Evolução Mensal</CardTitle>

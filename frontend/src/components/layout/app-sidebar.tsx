@@ -4,6 +4,8 @@ import {
   Settings,
   Tags,
   Wallet,
+  TrendingUp,
+  Landmark,
 } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
@@ -17,14 +19,17 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Transações", to: "/transactions", icon: ArrowLeftRight },
+  { label: "Investimentos", to: "/investments", icon: TrendingUp },
+  { label: "Patrimônio", to: "/wealth", icon: Landmark },
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { label: "Categorias", to: "/categories", icon: Tags },
   { label: "Configurações", to: "/settings", icon: Settings },
 ]
 
-export function AppSidebar() {
+// 1. Componente com o conteúdo interno da sidebar (reutilizável)
+export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card">
+    <div className="flex h-full flex-col">
       {/* Logo + nome do app */}
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -44,6 +49,7 @@ export function AppSidebar() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={onItemClick}
               className={({ isActive }) =>
                 cn(
                   "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -66,6 +72,15 @@ export function AppSidebar() {
           v0.1.0 · Em desenvolvimento
         </p>
       </div>
+    </div>
+  )
+}
+
+// 2. Sidebar para Desktop
+export function AppSidebar() {
+  return (
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card">
+      <SidebarContent />
     </aside>
   )
 }

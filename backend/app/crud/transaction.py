@@ -80,3 +80,17 @@ def update(db: Session, db_obj: Transaction, obj_in: TransactionUpdate) -> Trans
 def delete(db: Session, db_obj: Transaction) -> None:
     db.delete(db_obj)
     db.commit()
+    
+def create_bulk(db: Session, obj_in: list[TransactionCreate]) -> list[Transaction]:
+    """
+    Insere várias transações de uma vez (Bulk Insert).
+    Muito mais rápido que fazer N chamadas de `create`.
+    """
+    db_objs = [Transaction(**item.model_dump()) for item in obj_in]
+    db.add_all(db_objs)
+    db.commit()
+    
+    for obj in db_objs:
+        db.refresh(obj)
+        
+    return db_objs

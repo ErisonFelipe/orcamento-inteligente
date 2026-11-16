@@ -38,6 +38,7 @@ from app.schemas.transaction import (
     TransactionUpdate,
     TransactionPredictPayload,
     TransactionPredictResult,
+    TransactionBulkCreate,
 )
 from app.services.categorizer import categorizer 
 
@@ -65,6 +66,26 @@ def create_transaction(
     - Payload inválido → `422` automático (validação Pydantic).
     """
     return crud_transaction.create(db, payload)
+
+@router.post(
+    "/bulk",
+    response_model=list[TransactionRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar transações em lote",
+)
+def create_transactions_bulk(
+    payload: TransactionBulkCreate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    """
+    Cria várias transações de uma vez. Usado para receitas recorrentes 
+    e despesas parceladas.
+    """
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="A lista de transações está vazia.")
+    
+    # Chama a função de bulk que criamos no CRUD
+    return crud_transaction.create_bulk(db, payload.items)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,50 @@
+# ============================================================
+#  .gitignore do projeto Orçamento Inteligente
+#  Tudo o que estiver listado aqui NÃO será versionado pelo Git
+# ============================================================
+
+# ---------- Python / Backend ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# ---------- Node / Frontend ----------
+node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+.pnpm-store/
+
+# ---------- Variáveis de ambiente (contém SENHAS) ----------
+.env
+.env.*
+!.env.example
+Dados Sensiveis
+
+# ---------- IDEs / Editores ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---------- Sistema Operacional ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Logs e arquivos temporários ----------
+*.log
+logs/
+tmp/

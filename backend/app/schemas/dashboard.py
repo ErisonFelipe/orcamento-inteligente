@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 
 class CategoryExpense(BaseModel):
-    """Representa o total gasto em uma categoria específica."""
     category_id: int | None
     name: str
     color: str
@@ -15,13 +14,38 @@ class CategoryExpense(BaseModel):
 
 
 class MonthlySummary(BaseModel):
-    """Representa o total de receitas e despesas de um determinado mês."""
-    month: str  # Formato "YYYY-MM" (ex: "2026-11")
+    month: str
     income: Decimal
     expense: Decimal
 
 
+class ForecastInfo(BaseModel):
+    current_day: int
+    days_in_month: int
+    daily_average: Decimal
+    projected_expense: Decimal
+    projected_balance: Decimal
+    alert_message: str | None
+
+
 class DashboardSummary(BaseModel):
-    """Payload completo devolvido para a tela de Dashboard."""
     expenses_by_category: list[CategoryExpense]
     monthly_summary: list[MonthlySummary]
+    forecast: ForecastInfo | None
+    total_invested: Decimal
+
+
+# --- NOVOS SCHEMAS PARA PATRIMÔNIO ANUAL ---
+
+class AnnualWealthSummary(BaseModel):
+    """Resumo macro do patrimônio no ano selecionado."""
+    year: int
+    total_income: Decimal
+    total_expense: Decimal
+    liquid_cash: Decimal       # Receitas - Despesas
+    total_invested: Decimal
+    net_worth: Decimal         # Caixa + Investimentos
+    
+    projected_annual_income: Decimal
+    projected_annual_expense: Decimal
+    projected_annual_savings: Decimal

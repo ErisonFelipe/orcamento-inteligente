@@ -64,3 +64,7 @@ class TransactionPredictPayload(BaseModel):
 class TransactionPredictResult(BaseModel):
     """Resposta da IA com o ID da categoria sugerida."""
     category_id: int | None
+    
+class TransactionBulkCreate(BaseModel):
+    """Payload para criar várias transações de uma vez."""
+    items: list[TransactionCreate]
