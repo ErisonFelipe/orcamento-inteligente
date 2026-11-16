@@ -1,0 +1,23 @@
+# ============================================================
+# Dependências do backend — Orçamento Inteligente
+# Instalar com: pip install -r requirements.txt
+# ============================================================
+
+# --- Framework web ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# --- Banco de dados ---
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10
+
+# --- Validação e configuração ---
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# --- Testes ---
+httpx==0.27.2
+alembic==1.14.0
+scikit-learn==1.5.2
+joblib==1.4.2
