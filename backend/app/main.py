@@ -42,7 +42,30 @@ import app.models  # noqa: F401  (importado só pelo efeito colateral)
 
 
 @asynccontextmanager
+@asynccontextmanager
 async def lifespan(app: FastAPI):
+    # === STARTUP ===
+    Base.metadata.create_all(bind=engine)
+    print(f"[startup] Tabelas garantidas: {list(Base.metadata.tables.keys())}")
+    
+    # Treina a IA com os dados atuais do banco
+    print("[startup] Treinando modelo de IA...")
+    db = SessionLocal()
+    try:
+        from app.models import Transaction
+        count = db.query(Transaction).count()
+        if count > 0:
+            treinado = categorizer.train(db)
+            print(f"[startup] Modelo de IA treinado: {treinado}")
+        else:
+            print("[startup] Banco vazio, IA aguardando dados.")
+    except Exception as e:
+        print(f"[startup] Aviso: IA não treinada ainda ({e})")
+    finally:
+        db.close()
+
+    print(f"[startup] {settings.APP_NAME} pronto em /api/v1")
+    yield
     """
     Ciclo de vida da aplicação.
 

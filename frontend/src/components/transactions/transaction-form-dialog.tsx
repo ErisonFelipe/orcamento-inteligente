@@ -43,23 +43,16 @@ function valuesFromTransaction(t: TransactionRead): TransactionFormValues {
   }
 }
 
-// NOVO: Função que calcula a expressão matemática com segurança
 function evaluateMath(expression: string): string {
   try {
-    // Remove tudo que não for número ou operadores matemáticos básicos por segurança
     const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '')
     if (!sanitized) return expression
-    
-    // Usa Function para calcular a expressão (seguro pois já limpamos a string)
     // eslint-disable-next-line no-new-func
     const result = new Function(`return ${sanitized}`)()
-    
     if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
       return result.toFixed(2)
     }
-  } catch (error) {
-    // Se der erro (ex: 100 * * 2), ignora e mantém o texto original
-  }
+  } catch (error) {}
   return expression
 }
 
@@ -72,7 +65,10 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   
   const isSubmitting = createMutation.isPending || updateMutation.isPending || createBulkMutation.isPending
 
-  const [installments, setInstallments] = useState(1)
+  // Mudança: agora usamos string para permitir apagar o valor e digitar livremente
+  const [installmentsStr, setInstallmentsStr] = useState("1")
+  const installments = Number(installmentsStr) || 1 // Converte para número para a lógica
+
   const [isPredicting, setIsPredicting] = useState(false)
   const [aiSuggested, setAiSuggested] = useState<number | null>(null)
 
@@ -91,7 +87,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
     if (open) {
       form.reset(transaction ? valuesFromTransaction(transaction) : EMPTY_VALUES)
       setAiSuggested(null)
-      setInstallments(1)
+      setInstallmentsStr("1")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transaction])
@@ -111,7 +107,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
     getPrediction()
   }, [debouncedDescription, open, isEdit, form])
 
-  // NOVO: Se o usuário submeter o form sem sair do campo de valor, calcula a conta antes de validar
   async function onSubmit(values: TransactionFormValues) {
     const calculatedAmount = evaluateMath(values.amount)
     const finalValues = { ...values, amount: calculatedAmount }
@@ -155,7 +150,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
     }
   }
 
-  // Para a mensagem visual na tela
   const calculatedPreviewAmount = Number(evaluateMath(amount)) || 0
   const displayAmount = type === "expense" 
     ? calculatedPreviewAmount / installments 
@@ -201,8 +195,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
               <Label htmlFor="amount">
                 {type === "expense" && installments > 1 ? "Valor Total (R$)" : "Valor (R$)"}
               </Label>
-              
-              {/* NOVO: Input com cálculo matemático */}
               <Input 
                 id="amount" 
                 type="text" 
@@ -242,8 +234,13 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
                   min={1}
                   max={48}
                   className="w-24"
-                  value={installments}
-                  onChange={(e) => setInstallments(Math.max(1, Number(e.target.value)))}
+                  value={installmentsStr}
+                  onChange={(e) => setInstallmentsStr(e.target.value)}
+                  onBlur={() => {
+                    const num = Number(installmentsStr)
+                    if (isNaN(num) || num < 1) setInstallmentsStr("1")
+                    else if (num > 48) setInstallmentsStr("48")
+                  }}
                 />
                 <span className="text-sm text-muted-foreground">
                   {type === "expense" ? "parcelas" : "meses"}
@@ -287,7 +284,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
           </div>
         </form>
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
