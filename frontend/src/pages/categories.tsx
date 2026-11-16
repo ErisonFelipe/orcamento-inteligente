@@ -71,7 +71,6 @@ export function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho da Página */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Suas Categorias</h2>
@@ -85,7 +84,6 @@ export function CategoriesPage() {
         </Button>
       </div>
 
-      {/* Lista de Categorias */}
       {categories?.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
@@ -101,7 +99,6 @@ export function CategoriesPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {categories?.map((category) => (
             <Card key={category.id} className="group relative overflow-hidden">
-              {/* Faixa colorida no topo do card */}
               <div 
                 className="absolute top-0 left-0 w-full h-1.5" 
                 style={{ backgroundColor: category.color }} 
@@ -117,7 +114,6 @@ export function CategoriesPage() {
                   <span className="font-medium">{category.name}</span>
                 </div>
                 
-                {/* Botões de Ação */}
                 <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <Button 
                     variant="ghost" 
@@ -127,11 +123,11 @@ export function CategoriesPage() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  
                   <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    {/* AQUI ESTÁ A CORREÇÃO: Sem asChild, usando className direto no trigger */}
+                    <AlertDialogTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-8 w-8 text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
@@ -160,7 +156,6 @@ export function CategoriesPage() {
         </div>
       )}
 
-      {/* Modal de Criar/Editar */}
       <CategoryFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
