@@ -5,6 +5,7 @@ import type {
   TransactionCreate,
   TransactionFilters,
   TransactionUpdate,
+  TransactionBulkCreate,
 } from "@/types/transaction"
 
 export const transactionKeys = {

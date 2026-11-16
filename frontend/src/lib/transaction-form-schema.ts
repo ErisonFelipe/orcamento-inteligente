@@ -9,7 +9,7 @@ export const transactionFormSchema = z.object({
     .regex(/^\d+(\.\d{1,2})?$/, "Formato inválido (ex.: 42.75)")
     .refine((v) => Number(v) > 0, "Deve ser maior que zero")
     .refine((v) => Number(v) <= 9_999_999_999.99, "Valor máximo: 9.999.999.999,99"),
-  type: z.enum(["income", "expense"], { errorMap: () => ({ message: "Selecione o tipo" }) }),
+  type: z.enum(["income", "expense"], { message: "Selecione o tipo" }),
   
   // Mudou de string para number | null
   category_id: z.number().nullable().optional(), 
