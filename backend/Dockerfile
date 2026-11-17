@@ -1,18 +1,30 @@
-FROM python:3.10-slim
+# Estágio 1: Compilação (onde o gcc é instalado)
+FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
-# Instala apenas as dependências essenciais, sem recomendações e limpa o cache do apt
+# Instala dependências de sistema apenas para compilar
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-# Instala as dependências do Python sem cache e limpa os arquivos temporários
-RUN pip install --no-cache-dir -r requirements.txt \
-    && find /usr/local/lib/python3.10/site-packages -name "*.pyc" -delete \
-    && find /usr/local/lib/python3.10/site-packages -name "__pycache__" -type d -exec rm -rf {} +
+# Baixa e compila as dependências em formato de "wheels"
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# Estágio 2: Execução (imagem final leve)
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Copia apenas os wheels gerados no estágio 1
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+# Instala a partir dos wheels locais e limpa o cache
+RUN pip install --no-cache /wheels/* \
+    && rm -rf /wheels
 
 COPY . .
 
