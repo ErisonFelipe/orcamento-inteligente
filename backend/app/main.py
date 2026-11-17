@@ -20,6 +20,28 @@ import app.models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # === STARTUP ===
+    # REMOVIDO: Base.metadata.create_all(bind=engine) 
+    # O Alembic é o único responsável por criar as tabelas agora.
+    
+    print("[startup] Verificando modelo de IA...")
+    db = SessionLocal()
+    try:
+        from app.models import Transaction
+        count = db.query(Transaction).count()
+        if count > 0:
+            treinado = categorizer.train(db)
+            print(f"[startup] Modelo de IA treinado: {treinado}")
+        else:
+            print("[startup] Banco vazio, IA aguardando dados.")
+    except Exception as e:
+        print(f"[startup] Aviso: IA não treinada ainda ({e})")
+    finally:
+        db.close()
+
+    print(f"[startup] {settings.APP_NAME} pronto em /api/v1")
+    yield
+    print("[shutdown] Encerrando aplicação...")
+    # === STARTUP ===
     Base.metadata.create_all(bind=engine)
     print(f"[startup] Tabelas garantidas: {list(Base.metadata.tables.keys())}")
     
