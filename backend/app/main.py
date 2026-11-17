@@ -20,8 +20,8 @@ import app.models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # === STARTUP ===
-    # REMOVIDO: Base.metadata.create_all(bind=engine) 
-    # O Alembic é o único responsável por criar as tabelas agora.
+    Base.metadata.create_all(bind=engine)
+    print(f"[startup] Tabelas garantidas: {list(Base.metadata.tables.keys())}")
     
     print("[startup] Verificando modelo de IA...")
     db = SessionLocal()
