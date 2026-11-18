@@ -3,14 +3,14 @@ import { dashboardApi } from "@/services/api"
 
 export const dashboardKeys = {
   all: ["dashboard"] as const,
-  summary: () => [...dashboardKeys.all, "summary"] as const,
+  summary: (month?: number, year?: number) => [...dashboardKeys.all, "summary", month, year] as const,
   wealth: (year: number) => [...dashboardKeys.all, "wealth", year] as const,
 }
 
-export function useDashboardSummary() {
+export function useDashboardSummary(month?: number, year?: number) {
   return useQuery({
-    queryKey: dashboardKeys.summary(),
-    queryFn: () => dashboardApi.getSummary(),
+    queryKey: dashboardKeys.summary(month, year),
+    queryFn: () => dashboardApi.getSummary(month, year),
   })
 }
 

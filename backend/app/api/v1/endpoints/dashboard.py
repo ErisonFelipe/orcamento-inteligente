@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, case
 from sqlalchemy.orm import Session
 
@@ -29,8 +29,20 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/summary", response_model=DashboardSummary)
 def get_dashboard_summary(
     db: Annotated[Session, Depends(get_db)],
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None),
 ):
-    # 1. Gastos por Categoria
+    today = date.today()
+    target_month = month or today.month
+    target_year = year or today.year
+    
+    # Define o primeiro e o último dia do mês selecionado
+    first_day = date(target_year, target_month, 1)
+    last_day = date(target_year, target_month, calendar.monthrange(target_year, target_month)[1])
+    
+    target_month_str = f"{target_year}-{str(target_month).padStart(2, '0')}"
+
+    # 1. Gastos por Categoria (Filtrado pelo mês)
     stmt_cat = (
         select(
             Category.id.label("category_id"),
@@ -41,6 +53,8 @@ def get_dashboard_summary(
         .select_from(Transaction)
         .outerjoin(Category, Transaction.category_id == Category.id)
         .where(Transaction.type == TransactionType.EXPENSE)
+        .where(Transaction.date >= first_day)
+        .where(Transaction.date <= last_day)
         .group_by(Category.id, Category.name, Category.color)
         .order_by(func.sum(Transaction.amount).desc())
     )
@@ -54,6 +68,7 @@ def get_dashboard_summary(
         ) for row in expenses_result
     ]
 
+    # Total Investido (Global, não filtra por mês)
     total_invested_stmt = select(
         func.sum(
             case(
@@ -74,9 +89,24 @@ def get_dashboard_summary(
             )
         )
 
-    # 2. Resumo Mensal
-    month_col = func.to_char(Transaction.date, 'YYYY-MM').label('month')
+    # 2. Resumo Mensal (Apenas do mês selecionado para os cards)
     stmt_monthly = (
+        select(
+            func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
+            func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
+        )
+        .where(Transaction.date >= first_day)
+        .where(Transaction.date <= last_day)
+    )
+    res_monthly = db.execute(stmt_monthly).first()
+    
+    month_income = Decimal(res_monthly.income or 0)
+    month_expense = Decimal(res_monthly.expense or 0)
+
+    # O monthly_summary é usado para o gráfico de barras de evolução. 
+    # Vamos pegar os últimos 6 meses para manter o gráfico bonito.
+    month_col = func.to_char(Transaction.date, 'YYYY-MM').label('month')
+    stmt_history = (
         select(
             month_col,
             func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
@@ -85,38 +115,34 @@ def get_dashboard_summary(
         .group_by(month_col)
         .order_by(month_col.asc())
     )
-    monthly_result = db.execute(stmt_monthly).all()
+    history_result = db.execute(stmt_history).all()
     monthly_summary = [
         MonthlySummary(month=row.month, income=row.income, expense=row.expense)
-        for row in monthly_result
+        for row in history_result
     ]
 
-    # 3. Cálculo de Previsão (Forecast)
-    today = date.today()
-    current_month_str = today.strftime("%Y-%m")
-    days_in_month = calendar.monthrange(today.year, today.month)[1]
-    
-    current_month_data = next(
-        (m for m in monthly_summary if m.month == current_month_str), 
-        MonthlySummary(month=current_month_str, income=0, expense=0)
-    )
-
-    current_expense = Decimal(current_month_data.expense)
-    current_income = Decimal(current_month_data.income)
-    
-    daily_average = current_expense / today.day if today.day > 0 else Decimal(0)
-    projected_expense = daily_average * days_in_month
-    projected_balance = current_income - projected_expense
-
+    # 3. Cálculo de Previsão (Só faz sentido se o mês selecionado for o mês atual)
+    daily_average = Decimal(0)
+    projected_expense = month_expense
+    projected_balance = month_income - month_expense
     alert_message = None
-    if projected_balance < 0:
-        alert_message = "Atenção: No ritmo atual de gastos, seu saldo ficará negativo até o fim do mês."
-    elif current_income > 0 and current_expense > (current_income * Decimal('0.8')):
-        alert_message = "Cuidado: Você já gastou mais de 80% da sua receita deste mês."
+    current_day = 1
+    
+    if target_month == today.month and target_year == today.year:
+        current_day = today.day
+        days_in_month = calendar.monthrange(target_year, target_month)[1]
+        daily_average = month_expense / current_day if current_day > 0 else Decimal(0)
+        projected_expense = daily_average * days_in_month
+        projected_balance = month_income - projected_expense
+
+        if projected_balance < 0:
+            alert_message = "Atenção: No ritmo atual de gastos, seu saldo ficará negativo até o fim do mês."
+        elif month_income > 0 and month_expense > (month_income * Decimal('0.8')):
+            alert_message = "Cuidado: Você já gastou mais de 80% da sua receita deste mês."
 
     forecast = ForecastInfo(
-        current_day=today.day,
-        days_in_month=days_in_month,
+        current_day=current_day,
+        days_in_month=calendar.monthrange(target_year, target_month)[1],
         daily_average=round(daily_average, 2),
         projected_expense=round(projected_expense, 2),
         projected_balance=round(projected_balance, 2),
@@ -131,17 +157,12 @@ def get_dashboard_summary(
     )
 
 
-# --- NOVA ROTA DE PATRIMÔNIO ANUAL ---
-
 @router.get("/wealth", response_model=AnnualWealthSummary)
 def get_annual_wealth(
     db: Annotated[Session, Depends(get_db)],
     year: int = date.today().year,
 ):
-    """
-    Calcula o patrimônio líquido e as projeções anuais para o ano informado.
-    """
-    
+    # ... (código da rota /wealth mantido igual ao anterior) ...
     # 1. Totais de Transações no Ano
     stmt_transactions = (
         select(
@@ -154,10 +175,14 @@ def get_annual_wealth(
     total_income = Decimal(res_trans.income or 0)
     total_expense = Decimal(res_trans.expense or 0)
 
-    # 2. Total Investido no Ano
-    stmt_investments = (
-        select(func.sum(Investment.amount))
-        .where(func.extract('year', Investment.date) == year)
+    # 2. Total Investido Global
+    stmt_investments = select(
+        func.sum(
+            case(
+                (Investment.current_value.isnot(None), Investment.current_value),
+                else_=Investment.amount
+            )
+        )
     )
     total_invested = Decimal(db.scalar(stmt_investments) or 0)
 
@@ -168,12 +193,11 @@ def get_annual_wealth(
     # 4. Projeção Anual
     projected_income = total_income
     projected_expense = total_expense
-    
     today = date.today()
+    
     if year == today.year and today.month > 0:
         avg_monthly_income = total_income / today.month
         avg_monthly_expense = total_expense / today.month
-        
         projected_income = avg_monthly_income * 12
         projected_expense = avg_monthly_expense * 12
 
