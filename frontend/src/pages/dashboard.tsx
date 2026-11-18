@@ -1,5 +1,6 @@
 import { Pie, PieChart, Cell, Bar, BarChart, XAxis, YAxis } from "recharts"
 import { PieChart as PieIcon, TrendingUp, AlertTriangle, CalendarClock } from "lucide-react"
+import { useState } from "react"
 
 import { useDashboardSummary } from "@/hooks/use-dashboard"
 import { formatCurrency } from "@/lib/format"
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/chart"
 import type { ChartConfig } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
+import { MonthSelector } from "@/components/layout/month-selector"
 
 function formatMonthLabel(monthStr: string) {
   const [year, month] = monthStr.split("-")
@@ -30,11 +32,18 @@ function formatMonthLabel(monthStr: string) {
 }
 
 export function DashboardPage() {
-  const { data, isLoading, isError } = useDashboardSummary()
+  const today = new Date()
+  const [month, setMonth] = useState(today.getMonth() + 1)
+  const [year, setYear] = useState(today.getFullYear())
 
-  if (isLoading) {
+  const { data, isLoading, isError } = useDashboardSummary(month, year)
+
+if (isLoading) {
     return (
       <div className="space-y-4">
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-[180px]" />
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-[400px] w-full rounded-xl" />
           <Skeleton className="h-[400px] w-full rounded-xl" />
@@ -79,6 +88,15 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
+
+      {/* SELETOR DE PERÍODO */}
+      <div className="flex justify-end">
+        <MonthSelector 
+          month={month} 
+          year={year} 
+          onChange={(m, y) => { setMonth(m); setYear(y); }} 
+        />
+      </div>
       
       {/* BANNER DE ALERTA (Só aparece se o backend mandar uma mensagem) */}
       {forecast?.alert_message && (
