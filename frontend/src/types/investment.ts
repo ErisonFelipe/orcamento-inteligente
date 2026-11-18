@@ -3,6 +3,7 @@ export interface InvestmentCreate {
   type: string;
   amount: string;
   date: string;
+  current_value?: string | null;
 }
 
 export interface InvestmentUpdate {
@@ -10,6 +11,7 @@ export interface InvestmentUpdate {
   type?: string;
   amount?: string;
   date?: string;
+  current_value?: string | null;
 }
 
 export interface InvestmentRead {
