@@ -40,7 +40,7 @@ def get_dashboard_summary(
     first_day = date(target_year, target_month, 1)
     last_day = date(target_year, target_month, calendar.monthrange(target_year, target_month)[1])
     
-    target_month_str = f"{target_year}-{str(target_month).padStart(2, '0')}"
+    target_month_str = f"{target_year}-{target_month:02d}"
 
     # 1. Gastos por Categoria (Filtrado pelo mês)
     stmt_cat = (
