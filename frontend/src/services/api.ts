@@ -161,9 +161,17 @@ if (import.meta.env.DEV) {
 // ============================================================
 
 export const dashboardApi = {
- async getSummary(month?: number, year?: number): Promise<DashboardSummary> {
+  async getSummary(month?: number, year?: number): Promise<DashboardSummary> {
     const response = await api.get<DashboardSummary>("/dashboard/summary", {
       params: { month, year }
+    })
+    return response.data
+  },
+
+  
+  async getWealth(year: number): Promise<AnnualWealthSummary> {
+    const response = await api.get<AnnualWealthSummary>("/dashboard/wealth", {
+      params: { year },
     })
     return response.data
   },
