@@ -21,6 +21,8 @@ class Investment(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False) # Ex: Tesouro Direto, PETR4
     type: Mapped[str] = mapped_column(String(50), nullable=False)  # Ex: Renda Fixa, Ações, Cripto
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    
+    current_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

@@ -17,6 +17,7 @@ export interface InvestmentRead {
   name: string;
   type: string;
   amount: string;
+  current_value: string | null;
   date: string;
   created_at: string;
   updated_at: string;

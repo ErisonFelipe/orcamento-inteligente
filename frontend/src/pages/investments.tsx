@@ -62,6 +62,9 @@ export function InvestmentsPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
+  const [editingBalanceId, setEditingBalanceId] = useState<number | null>(null)
+  const [newBalance, setNewBalance] = useState("")
 
   const form = useForm<InvestmentFormValues>({
     resolver: zodResolver(investmentSchema),
@@ -167,6 +170,26 @@ export function InvestmentsPage() {
   const items = data?.items ?? []
   const totalInvested = items.reduce((acc, item) => acc + Number(item.amount), 0)
 
+  function openBalanceEdit(inv: any) {
+    setEditingBalanceId(inv.id)
+    setNewBalance(inv.current_value || inv.amount)
+    setIsBalanceDialogOpen(true)
+  }
+
+  async function handleSaveBalance() {
+    if (!editingBalanceId) return
+    try {
+      await updateMutation.mutateAsync({
+        id: editingBalanceId,
+        payload: { current_value: Number(newBalance).toFixed(2) }
+      })
+      toast.success("Saldo do ativo atualizado!")
+      setIsBalanceDialogOpen(false)
+    } catch (err) {
+      toast.error("Erro ao atualizar saldo")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -190,7 +213,7 @@ export function InvestmentsPage() {
         </Card>
       </div>
 
-      {isLoading ? (
+ {isLoading ? (
         <p>Carregando...</p>
       ) : items.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
@@ -199,25 +222,46 @@ export function InvestmentsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((inv) => (
-            <div key={inv.id} className="flex items-center justify-between p-4 border rounded-lg bg-card group">
-              <div>
-                <p className="font-medium">{inv.name}</p>
-                <p className="text-xs text-muted-foreground">{inv.type} · {formatDate(inv.date)}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <p className="font-semibold text-income">{formatCurrency(inv.amount)}</p>
-                <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(inv)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(inv.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+          {items.map((inv) => {
+            // Calcula a rentabilidade (se houver current_value)
+            const value = Number(inv.current_value || inv.amount)
+            const aporte = Number(inv.amount)
+            const profit = value - aporte
+            const profitPercentage = aporte > 0 ? (profit / aporte) * 100 : 0
+
+            return (
+              <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg bg-card group gap-4">
+                <div>
+                  <p className="font-medium">{inv.name}</p>
+                  <p className="text-xs text-muted-foreground">{inv.type} · {formatDate(inv.date)}</p>
+                </div>
+                
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground text-xs">Valor Atual</p>
+                    <p className="font-semibold text-primary">{formatCurrency(value.toString())}</p>
+                    {profit !== 0 && (
+                      <p className={`text-xs ${profit > 0 ? 'text-income' : 'text-expense'}`}>
+                        {profit > 0 ? '+' : ''}{formatCurrency(profit.toString())} ({profitPercentage.toFixed(1)}%)
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openBalanceEdit(inv)}>
+                      Atualizar
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(inv)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(inv.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -324,6 +368,32 @@ export function InvestmentsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+       {/* NOVO DIALOG: Atualizar Saldo */}
+      <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Atualizar Valor do Ativo</DialogTitle>
+            <DialogDescription>
+              Insira o valor de mercado atual do ativo. Seu aporte original não será alterado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Novo Valor (R$)</Label>
+              <Input 
+                type="number" 
+                step="0.01" 
+                value={newBalance} 
+                onChange={(e) => setNewBalance(e.target.value)} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBalanceDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveBalance} disabled={updateMutation.isPending}>Salvar Novo Valor</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

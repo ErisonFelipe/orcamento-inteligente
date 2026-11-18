@@ -54,7 +54,14 @@ def get_dashboard_summary(
         ) for row in expenses_result
     ]
 
-    total_invested_stmt = select(func.sum(Investment.amount))
+    total_invested_stmt = select(
+        func.sum(
+            case(
+                (Investment.current_value.isnot(None), Investment.current_value),
+                else_=Investment.amount
+            )
+        )
+    )
     total_invested = db.scalar(total_invested_stmt) or Decimal(0)
 
     if total_invested > 0:
