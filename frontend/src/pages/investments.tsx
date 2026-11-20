@@ -1,10 +1,11 @@
-import { useState } from "react"
-import { Plus, TrendingUp, Trash2, Pencil, Loader2 } from "lucide-react"
+import { useState, useMemo } from "react"
+import { Plus, TrendingUp, Trash2, Pencil, Loader2, Wallet } from "lucide-react"
 import { toast } from "sonner"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { formatCurrency, formatDate } from "@/lib/format"
+import { investmentsApi } from "@/services/api"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,7 +26,6 @@ import {
   useDeleteInvestment,
 } from "@/hooks/use-investments"
 
-// Motor de cálculo para os inputs
 function evaluateMath(expression: string): string {
   try {
     const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '')
@@ -39,7 +39,6 @@ function evaluateMath(expression: string): string {
   return expression
 }
 
-// Schema do formulário de investimento
 const investmentSchema = z.object({
   date: z.string().min(1, "Data obrigatória"),
   totalAmount: z.string().min(1, "Valor total obrigatório"),
@@ -62,9 +61,20 @@ export function InvestmentsPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+
+  // Modais de atualização de saldo
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [editingBalanceId, setEditingBalanceId] = useState<number | null>(null)
   const [newBalance, setNewBalance] = useState("")
+
+  const items = data?.items ?? []
+
+  // Calcula o valor total que já está em caixa (não alocado)
+  const currentCash = useMemo(() => {
+    return items
+      .filter((inv) => inv.name === "Caixa (Não alocado)" || inv.type === "Caixa")
+      .reduce((acc, inv) => acc + Number(inv.current_value || inv.amount), 0)
+  }, [items])
 
   const form = useForm<InvestmentFormValues>({
     resolver: zodResolver(investmentSchema),
@@ -87,7 +97,9 @@ export function InvestmentsPage() {
     return acc + (Number(evaluateMath(curr.amount || "0")) || 0)
   }, 0)
 
-  const remainingCash = watchTotal - totalAllocated
+  // O total disponível é o que está no caixa + o novo aporte
+  const totalAvailable = currentCash + watchTotal
+  const remainingCash = totalAvailable - totalAllocated
   const isOverAllocated = remainingCash < -0.01
 
   function openCreate() {
@@ -100,7 +112,6 @@ export function InvestmentsPage() {
     setIsDialogOpen(true)
   }
 
-  // A edição para investimentos é simplificada (só edita os dados básicos do ativo)
   function openEdit(inv: any) {
     setEditingId(inv.id)
     form.reset({ 
@@ -110,65 +121,6 @@ export function InvestmentsPage() {
     })
     setIsDialogOpen(true)
   }
-
-  async function onSubmit(values: InvestmentFormValues) {
-    if (isOverAllocated) {
-      toast.error("A soma das alocações é maior que o valor total.")
-      return
-    }
-
-    try {
-      if (editingId) {
-        // Edição simples (apenas 1 item)
-        await updateMutation.mutateAsync({ 
-          id: editingId, 
-          payload: {
-            name: values.allocations[0].name,
-            type: values.allocations[0].type,
-            amount: evaluateMath(values.allocations[0].amount),
-            date: values.date
-          } 
-        })
-        toast.success("Investimento atualizado")
-      } else {
-        // Criação com Rateio
-        const itemsToCreate = values.allocations.map(alloc => ({
-          name: alloc.name,
-          type: alloc.type,
-          amount: evaluateMath(alloc.amount),
-          date: values.date
-        }))
-
-        // Se sobrou dinheiro, adiciona no Caixa automaticamente
-        if (remainingCash > 0.01) {
-          itemsToCreate.push({
-            name: "Caixa (Não alocado)",
-            type: "Caixa",
-            amount: remainingCash.toFixed(2),
-            date: values.date
-          })
-        }
-
-        await createBulkMutation.mutateAsync({ items: itemsToCreate })
-        toast.success(`Aporte de ${formatCurrency(values.totalAmount)} registrado`)
-      }
-      setIsDialogOpen(false)
-    } catch (err) {
-      toast.error("Erro ao salvar investimento")
-    }
-  }
-
-  function handleDelete(id: number) {
-    if (confirm("Tem certeza que deseja excluir este investimento?")) {
-      deleteMutation.mutate(id, {
-        onSuccess: () => toast.success("Investimento excluído"),
-        onError: () => toast.error("Erro ao excluir"),
-      })
-    }
-  }
-
-  const items = data?.items ?? []
-  const totalInvested = items.reduce((acc, item) => acc + Number(item.amount), 0)
 
   function openBalanceEdit(inv: any) {
     setEditingBalanceId(inv.id)
@@ -190,6 +142,74 @@ export function InvestmentsPage() {
     }
   }
 
+  async function onSubmit(values: InvestmentFormValues) {
+    if (isOverAllocated) {
+      toast.error("A soma das alocações é maior que o valor disponível (Aporte + Caixa).")
+      return
+    }
+
+    try {
+      if (editingId) {
+        await updateMutation.mutateAsync({ 
+          id: editingId, 
+          payload: {
+            name: values.allocations[0].name,
+            type: values.allocations[0].type,
+            amount: evaluateMath(values.allocations[0].amount),
+            date: values.date
+          } 
+        })
+        toast.success("Investimento atualizado")
+      } else {
+        // 1. Encontra os registros antigos de caixa para deletar
+        const oldCashItems = items.filter(
+          (inv) => inv.name === "Caixa (Não alocado)" || inv.type === "Caixa"
+        )
+
+        // 2. Prepara os novos ativos
+        const itemsToCreate = values.allocations.map(alloc => ({
+          name: alloc.name,
+          type: alloc.type,
+          amount: evaluateMath(alloc.amount),
+          date: values.date
+        }))
+
+        // 3. Se sobrou dinheiro no caixa, adiciona o novo registro de caixa
+        if (remainingCash > 0.01) {
+          itemsToCreate.push({
+            name: "Caixa (Não alocado)",
+            type: "Caixa",
+            amount: remainingCash.toFixed(2),
+            date: values.date
+          })
+        }
+
+        // 4. Deleta os caixas antigos para não duplicar o dinheiro
+        if (oldCashItems.length > 0) {
+          await Promise.all(oldCashItems.map(inv => investmentsApi.delete(inv.id)))
+        }
+
+        // 5. Cria os novos registros
+        await createBulkMutation.mutateAsync({ items: itemsToCreate })
+        toast.success(`Aporte de ${formatCurrency(values.totalAmount)} registrado`)
+      }
+      setIsDialogOpen(false)
+    } catch (err) {
+      toast.error("Erro ao salvar investimento")
+    }
+  }
+
+  function handleDelete(id: number) {
+    if (confirm("Tem certeza que deseja excluir este investimento?")) {
+      deleteMutation.mutate(id, {
+        onSuccess: () => toast.success("Investimento excluído"),
+        onError: () => toast.error("Erro ao excluir"),
+      })
+    }
+  }
+
+  const totalInvested = items.reduce((acc, item) => acc + Number(item.current_value || item.amount), 0)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -202,18 +222,31 @@ export function InvestmentsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-muted-foreground">Patrimônio em Investimentos</p>
-            <p className="text-2xl font-bold text-income mt-2">
+            <p className="text-2xl font-bold text-primary mt-2">
               {formatCurrency(totalInvested.toString())}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-primary flex items-center gap-2">
+              <Wallet className="h-4 w-4" /> Caixa Disponível (Não Alocado)
+            </p>
+            <p className="text-2xl font-bold text-primary mt-2">
+              {formatCurrency(currentCash.toString())}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Este saldo pode ser usado no seu próximo aporte.
             </p>
           </CardContent>
         </Card>
       </div>
 
- {isLoading ? (
+      {isLoading ? (
         <p>Carregando...</p>
       ) : items.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
@@ -223,7 +256,6 @@ export function InvestmentsPage() {
       ) : (
         <div className="space-y-2">
           {items.map((inv) => {
-            // Calcula a rentabilidade (se houver current_value)
             const value = Number(inv.current_value || inv.amount)
             const aporte = Number(inv.amount)
             const profit = value - aporte
@@ -238,7 +270,7 @@ export function InvestmentsPage() {
                 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground text-xs">Valor Atual</p>
+                    <p className="text-xs text-muted-foreground">Valor Atual</p>
                     <p className="font-semibold text-primary">{formatCurrency(value.toString())}</p>
                     {profit !== 0 && (
                       <p className={`text-xs ${profit > 0 ? 'text-income' : 'text-expense'}`}>
@@ -265,6 +297,7 @@ export function InvestmentsPage() {
         </div>
       )}
 
+      {/* MODAL DE NOVO APORTE */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -283,9 +316,9 @@ export function InvestmentsPage() {
               </div>
               {!editingId && (
                 <div className="space-y-2">
-                  <Label>Valor Total Transferido (R$)</Label>
+                  <Label>Novo Valor Transferido (R$)</Label>
                   <Input 
-                    placeholder="Ex: 1000" 
+                    placeholder="Ex: 100" 
                     {...form.register("totalAmount", {
                       onBlur: (e) => {
                         const val = e.target.value
@@ -297,7 +330,13 @@ export function InvestmentsPage() {
               )}
             </div>
 
-            {/* LISTA DINÂMICA DE ALOCAÇÕES */}
+            {!editingId && (
+              <div className="p-2 bg-muted rounded text-sm flex justify-between">
+                <span>Caixa já existente:</span>
+                <span className="font-medium">{formatCurrency(currentCash.toFixed(2))}</span>
+              </div>
+            )}
+
             <div className="space-y-3 mt-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Distribuição (Para onde foi o dinheiro?)</Label>
@@ -339,21 +378,25 @@ export function InvestmentsPage() {
               ))}
             </div>
 
-            {/* RESUMO DO CAIXA */}
             {!editingId && (
               <div className={`p-3 rounded-md text-sm ${isOverAllocated ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
                 <div className="flex justify-between font-medium">
-                  <span>Total alocado:</span>
+                  <span>Total Disponível (Aporte + Caixa):</span>
+                  <span>{formatCurrency(totalAvailable.toFixed(2))}</span>
+                </div>
+                <div className="flex justify-between font-medium mt-1">
+                  <span>Total alocado agora:</span>
                   <span>{formatCurrency(totalAllocated.toFixed(2))}</span>
                 </div>
+                
                 {remainingCash > 0 ? (
                   <div className="flex justify-between mt-1 pt-1 border-t border-primary/20">
-                    <span>Sobra para Caixa da Corretora:</span>
+                    <span>Nova sobra para Caixa:</span>
                     <span className="font-bold">{formatCurrency(remainingCash.toFixed(2))}</span>
                   </div>
                 ) : remainingCash < 0 ? (
                   <div className="flex justify-between mt-1 pt-1 border-t border-destructive/20 font-bold">
-                    <span>Atenção: Valores excedem o total!</span>
+                    <span>Atenção: Valores excedem o disponível!</span>
                     <span>{formatCurrency(Math.abs(remainingCash).toFixed(2))}</span>
                   </div>
                 ) : null}
@@ -370,13 +413,14 @@ export function InvestmentsPage() {
           </form>
         </DialogContent>
       </Dialog>
-       {/* NOVO DIALOG: Atualizar Saldo */}
+
+      {/* MODAL DE ATUALIZAR SALDO */}
       <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Atualizar Valor do Ativo</DialogTitle>
             <DialogDescription>
-              Insira o valor de mercado atual do ativo. Seu aporte original não será alterado.
+              Insira o valor de mercado atual. O aporte original não muda.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -392,7 +436,7 @@ export function InvestmentsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsBalanceDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveBalance} disabled={updateMutation.isPending}>Salvar Novo Valor</Button>
+            <Button onClick={handleSaveBalance} disabled={updateMutation.isPending}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
