@@ -49,3 +49,11 @@ class AnnualWealthSummary(BaseModel):
     projected_annual_income: Decimal
     projected_annual_expense: Decimal
     projected_annual_savings: Decimal
+    
+class CashflowMonth(BaseModel):
+    month: str  # Formato "YYYY-MM"
+    balance: Decimal # Saldo projetado ao final do mês
+
+class CashflowForecast(BaseModel):
+    current_balance: Decimal
+    forecast: list[CashflowMonth]

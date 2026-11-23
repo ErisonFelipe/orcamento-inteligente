@@ -3,7 +3,7 @@ Endpoints para o Dashboard (dados agregados, previsão e patrimônio).
 """
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated
 
@@ -21,6 +21,8 @@ from app.schemas.dashboard import (
     MonthlySummary,
     ForecastInfo,
     AnnualWealthSummary,
+    CashflowForecast,
+    CashflowMonth,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -213,4 +215,64 @@ def get_annual_wealth(
         projected_annual_income=round(projected_income, 2),
         projected_annual_expense=round(projected_expense, 2),
         projected_annual_savings=round(projected_savings, 2)
+    )
+    
+@router.get("/cashflow", response_model=CashflowForecast)
+def get_cashflow_forecast(
+    db: Annotated[Session, Depends(get_db)],
+    months: int = Query(6, ge=1, le=12),
+):
+    today = date.today()
+    
+    # 1. Saldo atual (passado)
+    stmt_past = select(
+        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=-Transaction.amount))
+    ).where(Transaction.date <= today)
+    
+    current_balance = db.scalar(stmt_past) or Decimal(0)
+
+    # 2. Transações futuras
+    future_month_col = func.to_char(Transaction.date, 'YYYY-MM').label('month')
+    stmt_future = (
+        select(
+            future_month_col,
+            func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
+            func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
+        )
+        .where(Transaction.date > today)
+        .group_by(future_month_col)
+        .order_by(future_month_col.asc())
+        .limit(months)
+    )
+    future_result = db.execute(stmt_future).all()
+
+    # 3. Monta a projeção
+    forecast_list = []
+    running_balance = current_balance
+    future_dict = {row.month: (Decimal(row.income or 0), Decimal(row.expense or 0)) for row in future_result}
+
+    current_y, current_m = today.year, today.month
+    
+    for _ in range(months):
+        current_m += 1
+        if current_m > 12:
+            current_m = 1
+            current_y += 1
+            
+        month_str = f"{current_y}-{current_m:02d}"
+        
+        if month_str in future_dict:
+            inc, exp = future_dict[month_str]
+            running_balance += (inc - exp)
+
+        forecast_list.append(
+            CashflowMonth(
+                month=month_str,
+                balance=running_balance
+            )
+        )
+
+    return CashflowForecast(
+        current_balance=current_balance,
+        forecast=forecast_list
     )
