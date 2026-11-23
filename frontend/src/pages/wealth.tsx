@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Landmark, ArrowUpRight, ArrowDownRight, PiggyBank, Target, CalendarDays } from "lucide-react"
+import { Landmark, ArrowUpRight, ArrowDownRight, PiggyBank, Target, CalendarDays, TrendingUp } from "lucide-react"
 
 import { useWealthSummary } from "@/hooks/use-dashboard"
 import { formatCurrency } from "@/lib/format"
