@@ -36,7 +36,6 @@ export function WealthPage() {
 
   return (
     <div className="space-y-6">
-      
       {/* Cabeçalho com Seletor de Ano */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -46,9 +45,7 @@ export function WealthPage() {
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
           <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {availableYears.map((y) => (
                 <SelectItem key={y} value={String(y)}>{y}</SelectItem>
@@ -58,12 +55,12 @@ export function WealthPage() {
         </div>
       </div>
 
-      {/* CARD PRINCIPAL: PATRIMÔNIO LÍQUIDO */}
+      {/* PATRIMÔNIO LÍQUIDO (Sempre HOJE) */}
       <Card className="bg-primary/5 border-primary/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-primary flex items-center gap-2">
             <Landmark className="h-4 w-4" />
-            Patrimônio Líquido ({data.year})
+            Patrimônio Líquido Hoje
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -71,23 +68,39 @@ export function WealthPage() {
             {formatCurrency(data.net_worth)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Dinheiro em conta + Investimentos
+            Saldo em conta hoje + Investimentos
           </p>
         </CardContent>
       </Card>
 
       {/* GRID DE TOTAIS REAIS */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        
+        {/* NOVO CARD: CAIXA HOJE */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Caixa (Saldo em Conta)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Caixa Atual</CardTitle>
             <PiggyBank className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${Number(data.liquid_cash) < 0 ? 'text-expense' : 'text-foreground'}`}>
-              {formatCurrency(data.liquid_cash)}
+            <p className={`text-2xl font-bold ${Number(data.current_cash) < 0 ? 'text-expense' : 'text-foreground'}`}>
+              {formatCurrency(data.current_cash)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Receitas - Despesas</p>
+            <p className="text-xs text-muted-foreground mt-1">Disponível em conta hoje</p>
+          </CardContent>
+        </Card>
+
+        {/* NOVO CARD: CAIXA PROJETADO */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Caixa Projetado</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <p className={`text-2xl font-bold ${Number(data.projected_cash) < 0 ? 'text-expense' : 'text-primary'}`}>
+              {formatCurrency(data.projected_cash)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Previsão para fim de {data.year}</p>
           </CardContent>
         </Card>
 
@@ -100,23 +113,23 @@ export function WealthPage() {
             <p className="text-2xl font-bold text-primary">
               {formatCurrency(data.total_invested)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Aportes no ano</p>
+            <p className="text-xs text-muted-foreground mt-1">Patrimônio em ativos</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total de Receitas</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Receitas no Ano</CardTitle>
             <ArrowUpRight className="h-4 w-4 text-income" />
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-income">{formatCurrency(data.total_income)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Entradas no ano</p>
+            <p className="text-xs text-muted-foreground mt-1">Entradas em {data.year}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* PROJEÇÕES ANUAIS */}
+      {/* PROJEÇÕES ANUAIS (Mantido) */}
       <div className="mt-8">
         <h3 className="text-lg font-semibold mb-4">Projeções para o Final do Ano</h3>
         <div className="grid gap-4 md:grid-cols-3">

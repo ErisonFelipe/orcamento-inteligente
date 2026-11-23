@@ -38,43 +38,43 @@ def get_multi(
     date_to: date | None = None,
 ) -> tuple[list[Transaction], int, Decimal, Decimal]:
     
-    # 1. Query Base para os itens (com joinedload)
-    items_query = select(Transaction).options(joinedload(Transaction.category))
+    # 1. Query Base (Aplica todos os filtros)
+    base_query = select(Transaction)
     
     if type is not None:
-        items_query = items_query.where(Transaction.type == type)
+        base_query = base_query.where(Transaction.type == type)
     if date_from is not None:
-        items_query = items_query.where(Transaction.date >= date_from)
+        base_query = base_query.where(Transaction.date >= date_from)
     if date_to is not None:
-        items_query = items_query.where(Transaction.date <= date_to)
+        base_query = base_query.where(Transaction.date <= date_to)
     if category is not None:
-        items_query = items_query.join(Category).where(Category.name.ilike(f"%{category}%"))
+        base_query = base_query.join(Category).where(Category.name.ilike(f"%{category}%"))
 
     # 2. Contagem total
-    total = db.scalar(select(func.count()).select_from(items_query.subquery())) or 0
+    total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
 
-    # 3. Query separada para os totais (mais segura)
-    totals_query = select(
-        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
-        func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
+    # 3. Buscar os itens paginados
+    items_query = (
+        base_query
+        .options(joinedload(Transaction.category))
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .offset(skip)
+        .limit(limit)
     )
-    
-    if type is not None:
-        totals_query = totals_query.where(Transaction.type == type)
-    if date_from is not None:
-        totals_query = totals_query.where(Transaction.date >= date_from)
-    if date_to is not None:
-        totals_query = totals_query.where(Transaction.date <= date_to)
-    if category is not None:
-        totals_query = totals_query.join(Category).where(Category.name.ilike(f"%{category}%"))
-
-    totals = db.execute(totals_query).first()
-    total_income = Decimal(totals.income or 0) if totals else Decimal(0)
-    total_expense = Decimal(totals.expense or 0) if totals else Decimal(0)
-
-    # 4. Paginação e ordenação dos itens
-    items_query = items_query.order_by(Transaction.date.desc(), Transaction.id.desc()).offset(skip).limit(limit)
     items = list(db.scalars(items_query).unique().all())
+
+    # 4. Soma de Receitas (ignora o filtro de 'type' se ele já estiver definido como 'income')
+    # Se o usuário filtrou por "Despesas", a soma de receitas aqui será 0.
+    income_query = base_query.where(Transaction.type == TransactionType.INCOME)
+    total_income = db.scalar(
+        select(func.sum(Transaction.amount)).select_from(income_query.subquery())
+    ) or Decimal(0)
+
+    # 5. Soma de Despesas
+    expense_query = base_query.where(Transaction.type == TransactionType.EXPENSE)
+    total_expense = db.scalar(
+        select(func.sum(Transaction.amount)).select_from(expense_query.subquery())
+    ) or Decimal(0)
 
     return items, total, total_income, total_expense
 

@@ -42,9 +42,12 @@ class AnnualWealthSummary(BaseModel):
     year: int
     total_income: Decimal
     total_expense: Decimal
-    liquid_cash: Decimal       # Receitas - Despesas
+    
+    current_cash: Decimal      # NOVO: Dinheiro em conta hoje
+    projected_cash: Decimal    # NOVO: Dinheiro em conta no fim do ano
+    
     total_invested: Decimal
-    net_worth: Decimal         # Caixa + Investimentos
+    net_worth: Decimal         # Patrimônio Líquido HOJE
     
     projected_annual_income: Decimal
     projected_annual_expense: Decimal

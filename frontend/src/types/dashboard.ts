@@ -31,7 +31,8 @@ export interface AnnualWealthSummary {
   year: number;
   total_income: string;
   total_expense: string;
-  liquid_cash: string;
+  current_cash: string;
+  projected_cash: string;
   total_invested: string;
   net_worth: string;
   projected_annual_income: string;

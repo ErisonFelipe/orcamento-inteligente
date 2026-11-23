@@ -164,20 +164,35 @@ def get_annual_wealth(
     db: Annotated[Session, Depends(get_db)],
     year: int = date.today().year,
 ):
-    # ... (código da rota /wealth mantido igual ao anterior) ...
-    # 1. Totais de Transações no Ano
-    stmt_transactions = (
-        select(
-            func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
-            func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
-        )
-        .where(func.extract('year', Transaction.date) == year)
-    )
-    res_trans = db.execute(stmt_transactions).first()
-    total_income = Decimal(res_trans.income or 0)
-    total_expense = Decimal(res_trans.expense or 0)
+    today = date.today()
+    
+    # 1. Saldo Atual (Tudo até HOJE, independente do ano selecionado)
+    stmt_current = select(
+        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=-Transaction.amount))
+    ).where(Transaction.date <= today)
+    current_cash = db.scalar(stmt_current) or Decimal(0)
 
-    # 2. Total Investido Global
+    # 2. Transações Futuras no ano selecionado (Do dia de hoje até 31/12 do ano)
+    first_day = date(year, 1, 1)
+    last_day = date(year, 12, 31)
+    
+    stmt_future = select(
+        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=-Transaction.amount))
+    ).where(Transaction.date > today).where(Transaction.date >= first_day).where(Transaction.date <= last_day)
+    future_cash = db.scalar(stmt_future) or Decimal(0)
+    
+    projected_cash = current_cash + future_cash
+
+    # 3. Totais do ano selecionado (para os cards de Receitas e Despesas)
+    stmt_year = select(
+        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
+        func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
+    ).where(Transaction.date >= first_day).where(Transaction.date <= last_day)
+    res_year = db.execute(stmt_year).first()
+    total_income = Decimal(res_year.income or 0)
+    total_expense = Decimal(res_year.expense or 0)
+
+    # 4. Total Investido (Global, já com current_value)
     stmt_investments = select(
         func.sum(
             case(
@@ -188,20 +203,15 @@ def get_annual_wealth(
     )
     total_invested = Decimal(db.scalar(stmt_investments) or 0)
 
-    # 3. Matemática do Patrimônio
-    liquid_cash = total_income - total_expense
-    net_worth = liquid_cash + total_invested
+    # 5. Patrimônio Líquido HOJE
+    net_worth = current_cash + total_invested
 
-    # 4. Projeção Anual
+    # 6. Projeções
     projected_income = total_income
     projected_expense = total_expense
-    today = date.today()
-    
     if year == today.year and today.month > 0:
-        avg_monthly_income = total_income / today.month
-        avg_monthly_expense = total_expense / today.month
-        projected_income = avg_monthly_income * 12
-        projected_expense = avg_monthly_expense * 12
+        projected_income = (total_income / today.month) * 12
+        projected_expense = (total_expense / today.month) * 12
 
     projected_savings = projected_income - projected_expense
 
@@ -209,7 +219,8 @@ def get_annual_wealth(
         year=year,
         total_income=total_income,
         total_expense=total_expense,
-        liquid_cash=liquid_cash,
+        current_cash=current_cash,
+        projected_cash=projected_cash,
         total_invested=total_invested,
         net_worth=net_worth,
         projected_annual_income=round(projected_income, 2),
