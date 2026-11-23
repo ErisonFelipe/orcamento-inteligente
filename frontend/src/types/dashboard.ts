@@ -38,3 +38,13 @@ export interface AnnualWealthSummary {
   projected_annual_expense: string;
   projected_annual_savings: string;
 }
+
+export interface CashflowMonth {
+  month: string;
+  balance: string;
+}
+
+export interface CashflowForecast {
+  current_balance: string;
+  forecast: CashflowMonth[];
+}

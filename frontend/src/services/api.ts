@@ -14,7 +14,7 @@ import type {
   CategoryRead,
   CategoryUpdate,
 } from "@/types/category"
-import type { DashboardSummary, AnnualWealthSummary } from "@/types/dashboard"
+import type { DashboardSummary, AnnualWealthSummary, CashflowForecast } from "@/types/dashboard"
 import type { InvestmentCreate, InvestmentListResult, InvestmentRead, InvestmentUpdate, InvestmentBulkCreate } from "@/types/investment"
 
 const API_BASE_URL = "/api/v1"
@@ -172,6 +172,13 @@ export const dashboardApi = {
   async getWealth(year: number): Promise<AnnualWealthSummary> {
     const response = await api.get<AnnualWealthSummary>("/dashboard/wealth", {
       params: { year },
+    })
+    return response.data
+  },
+
+  async getCashflow(months: number = 6): Promise<CashflowForecast> {
+    const response = await api.get<CashflowForecast>("/dashboard/cashflow", {
+      params: { months }
     })
     return response.data
   },
