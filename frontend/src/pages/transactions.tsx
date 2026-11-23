@@ -16,7 +16,7 @@ import {
 } from "@/components/transactions/transactions-states"
 import type { TransactionFilters, TransactionType } from "@/types/transaction"
 
-const LIMIT = 50
+const LIMIT = 10
 
 export function TransactionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -28,7 +28,7 @@ export function TransactionsPage() {
   const dateFrom = searchParams.get("date_from") ?? undefined
   const dateTo = searchParams.get("date_to") ?? undefined
 
-  // Mês e Ano para o seletor visual (baseado no dateFrom da URL)
+  // Mês e Ano para o seletor visual
   const [currentDate, setCurrentDate] = useState(() => {
     if (dateFrom) {
       const [y, m] = dateFrom.split("-").map(Number)
@@ -41,20 +41,30 @@ export function TransactionsPage() {
   const [searchCategory, setSearchCategory] = useState(category ?? "")
   const debouncedCategory = useDebounce(searchCategory, 500)
 
+  // Força o filtro do mês atual ao abrir a página
   useEffect(() => {
     if (!dateFrom && !dateTo && page === 1) {
       handleMonthChange(currentDate.month, currentDate.year)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, page])
 
+  useEffect(() => {
+    if (debouncedCategory === (category ?? "")) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (debouncedCategory) next.set("category", debouncedCategory)
+      else next.delete("category")
+      next.set("page", "1")
+      return next
+    })
+  }, [debouncedCategory, category, setSearchParams])
 
-  // Função que o seletor chama ao mudar de mês
   function handleMonthChange(month: number, year: number) {
     setCurrentDate({ month, year })
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       
-      // Calcula o primeiro e último dia do mês
       const from = `${year}-${String(month).padStart(2, '0')}-01`
       const lastDay = new Date(year, month, 0).getDate()
       const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
@@ -132,7 +142,12 @@ export function TransactionsPage() {
           <TransactionsError error={error} onRetry={() => refetch()} />
         ) : (
           <>
-            <TransactionsSummary items={data?.items ?? []} />
+            {/* AQUI ESTÁ A CORREÇÃO: Passando os novos props */}
+            <TransactionsSummary 
+              income={data?.total_income ?? "0"} 
+              expense={data?.total_expense ?? "0"} 
+              balance={(Number(data?.total_income ?? 0) - Number(data?.total_expense ?? 0)).toFixed(2)} 
+            />
 
             {(data?.items?.length ?? 0) === 0 ? (
               <div className="mt-6">
@@ -145,11 +160,11 @@ export function TransactionsPage() {
                 </p>
                 <TransactionsList items={data?.items ?? []} />
                 
-                  <TransactionsSummary 
-                    income={data?.total_income ?? "0"} 
-                    expense={data?.total_expense ?? "0"} 
-                    balance={(Number(data?.total_income ?? 0) - Number(data?.total_expense ?? 0)).toFixed(2)} 
-                  />
+                <TransactionsPagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
               </div>
             )}
           </>
