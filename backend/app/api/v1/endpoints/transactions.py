@@ -39,6 +39,7 @@ from app.schemas.transaction import (
     TransactionPredictPayload,
     TransactionPredictResult,
     TransactionBulkCreate,
+    TransactionListResult,
 )
 from app.services.categorizer import categorizer 
 
@@ -241,3 +242,21 @@ def predict_category(payload: TransactionPredictPayload) -> TransactionPredictRe
     category_id = categorizer.predict(payload.description)
     return TransactionPredictResult(category_id=category_id)
     
+@router.get("", response_model=TransactionListResult)
+def list_transactions(
+    db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    # ... (parâmetros anteriores) ...
+) -> TransactionListResult:
+    
+    items, total, total_income, total_expense = crud_transaction.get_multi(
+        db, skip=skip, limit=limit, type=type, category=category, date_from=date_from, date_to=date_to
+    )
+    response.headers["X-Total-Count"] = str(total)
+    
+    return TransactionListResult(
+        items=items,
+        total=total,
+        total_income=total_income,
+        total_expense=total_expense
+    )

@@ -68,3 +68,9 @@ class TransactionPredictResult(BaseModel):
 class TransactionBulkCreate(BaseModel):
     """Payload para criar várias transações de uma vez."""
     items: list[TransactionCreate]
+    
+class TransactionListResult(BaseModel):
+    items: list[TransactionRead]
+    total: int
+    total_income: Decimal
+    total_expense: Decimal

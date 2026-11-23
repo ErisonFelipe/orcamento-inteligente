@@ -1,12 +1,11 @@
 from datetime import date
-
-from sqlalchemy import func, select
+from decimal import Decimal
+from sqlalchemy import func, select, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.category import Category
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
-
 
 def create(db: Session, obj_in: TransactionCreate) -> Transaction:
     dados = obj_in.model_dump()
@@ -34,26 +33,33 @@ def get_multi(
     skip: int = 0,
     limit: int = 50,
     type: TransactionType | None = None,
-    category: str | None = None, # Filtro pelo NOME da categoria agora
+    category: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
-) -> tuple[list[Transaction], int]:
+) -> tuple[list[Transaction], int, Decimal, Decimal]:
     
     base_stmt = select(Transaction).options(joinedload(Transaction.category))
 
     if type is not None:
         base_stmt = base_stmt.where(Transaction.type == type)
     if category is not None:
-        # Faz o JOIN para buscar pelo nome da categoria
         base_stmt = base_stmt.join(Transaction.category).where(Category.name.ilike(f"%{category}%"))
     if date_from is not None:
         base_stmt = base_stmt.where(Transaction.date >= date_from)
     if date_to is not None:
         base_stmt = base_stmt.where(Transaction.date <= date_to)
 
-    total = db.scalar(
-        select(func.count()).select_from(base_stmt.subquery())
-    ) or 0
+    total = db.scalar(select(func.count()).select_from(base_stmt.subquery())) or 0
+
+    # NOVO: Calcula o total de receitas e despesas no banco (respeitando os filtros)
+    totals_stmt = select(
+        func.sum(case((Transaction.type == TransactionType.INCOME, Transaction.amount), else_=0)).label("income"),
+        func.sum(case((Transaction.type == TransactionType.EXPENSE, Transaction.amount), else_=0)).label("expense")
+    ).select_from(base_stmt.subquery())
+    
+    totals_result = db.execute(totals_stmt).first()
+    total_income = Decimal(totals_result.income or 0)
+    total_expense = Decimal(totals_result.expense or 0)
 
     stmt = (
         base_stmt
@@ -63,7 +69,7 @@ def get_multi(
     )
     items = list(db.scalars(stmt).unique().all())
 
-    return items, total
+    return items, total, total_income, total_expense
 
 
 def update(db: Session, db_obj: Transaction, obj_in: TransactionUpdate) -> Transaction:

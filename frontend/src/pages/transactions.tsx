@@ -42,15 +42,11 @@ export function TransactionsPage() {
   const debouncedCategory = useDebounce(searchCategory, 500)
 
   useEffect(() => {
-    if (debouncedCategory === (category ?? "")) return
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (debouncedCategory) next.set("category", debouncedCategory)
-      else next.delete("category")
-      next.set("page", "1")
-      return next
-    })
-  }, [debouncedCategory, category, setSearchParams])
+    if (!dateFrom && !dateTo && page === 1) {
+      handleMonthChange(currentDate.month, currentDate.year)
+    }
+  }, [dateFrom, dateTo, page])
+
 
   // Função que o seletor chama ao mudar de mês
   function handleMonthChange(month: number, year: number) {
@@ -149,11 +145,11 @@ export function TransactionsPage() {
                 </p>
                 <TransactionsList items={data?.items ?? []} />
                 
-                <TransactionsPagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
+                  <TransactionsSummary 
+                    income={data?.total_income ?? "0"} 
+                    expense={data?.total_expense ?? "0"} 
+                    balance={(Number(data?.total_income ?? 0) - Number(data?.total_expense ?? 0)).toFixed(2)} 
+                  />
               </div>
             )}
           </>

@@ -42,6 +42,8 @@ export interface TransactionFilters {
 export interface TransactionListResult {
   items: TransactionRead[];
   total: number;
+  total_income: string;
+  total_expense: string;
 }
 
 export interface TransactionPredictResult {

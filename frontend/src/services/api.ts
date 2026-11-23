@@ -85,12 +85,10 @@ function defaultMessageFor(status: number): string {
 
 export const transactionsApi = {
   async list(filters: TransactionFilters = {}): Promise<TransactionListResult> {
-    const response = await api.get<TransactionRead[]>("/transactions", {
+    const response = await api.get<TransactionListResult>("/transactions", {
       params: filters,
     })
-    const totalHeader = response.headers["x-total-count"]
-    const total = totalHeader ? Number(totalHeader) : response.data.length
-    return { items: response.data, total }
+    return response.data
   },
 
   async get(id: number): Promise<TransactionRead> {
