@@ -65,9 +65,8 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   
   const isSubmitting = createMutation.isPending || updateMutation.isPending || createBulkMutation.isPending
 
-  // Mudança: agora usamos string para permitir apagar o valor e digitar livremente
   const [installmentsStr, setInstallmentsStr] = useState("1")
-  const installments = Number(installmentsStr) || 1 // Converte para número para a lógica
+  const installments = Number(installmentsStr) || 1
 
   const [isPredicting, setIsPredicting] = useState(false)
   const [aiSuggested, setAiSuggested] = useState<number | null>(null)
@@ -117,24 +116,30 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
         toast.success("Transação atualizada", { description: finalValues.description })
       } else if (installments > 1) {
         const basePayload = toCreatePayload(finalValues)
-        
-        const amountPerItem = type === "expense" 
-          ? Number((Number(basePayload.amount) / installments).toFixed(2))
-          : Number(basePayload.amount)
-          
+        const totalValue = Number(basePayload.amount)
+        const isExpense = type === "expense"
+
+        // Lógica à prova de falhas:
+        // Se for Despesa: divide o total.
+        // Se for Receita: mantém o valor cheio.
+        const valuePerItem = isExpense 
+          ? Number((totalValue / installments).toFixed(2))
+          : totalValue
+
         const items = Array.from({ length: installments }).map((_, index) => {
-          let finalAmount = amountPerItem
-          if (index === installments - 1 && type === "expense") {
-            finalAmount = Number(basePayload.amount) - (amountPerItem * (installments - 1))
+          let finalItemAmount = valuePerItem
+
+          // Ajuste de centavos na última parcela apenas se for despesa
+          if (isExpense && index === installments - 1) {
+            const sumOfPrevious = valuePerItem * (installments - 1)
+            finalItemAmount = Number((totalValue - sumOfPrevious).toFixed(2))
           }
 
           return {
             ...basePayload,
-            amount: finalAmount.toFixed(2),
+            amount: finalItemAmount.toFixed(2),
             date: addMonths(basePayload.date, index),
-            description: type === "expense" 
-              ? `${finalValues.description} (${index + 1}/${installments})`
-              : `${finalValues.description} (${index + 1}/${installments})`
+            description: `${finalValues.description} (${index + 1}/${installments})`
           }
         })
 
@@ -151,7 +156,9 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   }
 
   const calculatedPreviewAmount = Number(evaluateMath(amount)) || 0
-  const displayAmount = type === "expense" 
+  const isExpensePreview = type === "expense"
+  
+  const displayAmount = isExpensePreview 
     ? calculatedPreviewAmount / installments 
     : calculatedPreviewAmount
 
@@ -193,7 +200,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">
-                {type === "expense" && installments > 1 ? "Valor Total (R$)" : "Valor (R$)"}
+                {isExpensePreview && installments > 1 ? "Valor Total (R$)" : "Valor (R$)"}
               </Label>
               <Input 
                 id="amount" 
@@ -225,7 +232,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
           {!isEdit && (
             <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border">
               <Label htmlFor="installments" className="text-sm font-semibold">
-                {type === "expense" ? "Parcelar em quantas vezes?" : "Repetir por quantos meses?"}
+                {isExpensePreview ? "Parcelar em quantas vezes?" : "Repetir por quantos meses?"}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -243,13 +250,13 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
                   }}
                 />
                 <span className="text-sm text-muted-foreground">
-                  {type === "expense" ? "parcelas" : "meses"}
+                  {isExpensePreview ? "parcelas" : "meses"}
                 </span>
               </div>
               {installments > 1 && (
                 <p className="text-xs text-primary mt-1">
                   Serão criadas {installments} transações de {formatCurrency(displayAmount.toFixed(2))}.
-                  {type === "income" && ` (Total: ${formatCurrency((calculatedPreviewAmount * installments).toFixed(2))})`}
+                  {!isExpensePreview && ` (Total: ${formatCurrency((calculatedPreviewAmount * installments).toFixed(2))})`}
                 </p>
               )}
             </div>
