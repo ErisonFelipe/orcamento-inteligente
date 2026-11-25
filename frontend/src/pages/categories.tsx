@@ -21,9 +21,12 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export function CategoriesPage() {
-  const { data: categories, isLoading, isError, refetch } = useCategories()
+  const { data: rawCategories, isLoading, isError, refetch } = useCategories()
   const deleteMutation = useDeleteCategory()
   
+  // BLINDAGEM: Garante que categories sempre será um array
+  const categories = Array.isArray(rawCategories) ? rawCategories : []
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<CategoryRead | null>(null)
 
@@ -61,7 +64,7 @@ export function CategoriesPage() {
   if (isError) {
     return (
       <div className="p-8 text-center text-destructive">
-        <p>Erro ao carregar as categorias.</p>
+        <p>Erro ao carregar as categorias. Verifique se o backend está rodando.</p>
         <Button variant="outline" onClick={() => refetch()} className="mt-4">
           Tentar novamente
         </Button>
@@ -84,7 +87,7 @@ export function CategoriesPage() {
         </Button>
       </div>
 
-      {categories?.length === 0 ? (
+      {categories.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
             <Tags className="h-8 w-8" />
@@ -97,7 +100,7 @@ export function CategoriesPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {categories?.map((category) => (
+          {categories.map((category) => (
             <Card key={category.id} className="group relative overflow-hidden">
               <div 
                 className="absolute top-0 left-0 w-full h-1.5" 
@@ -125,7 +128,6 @@ export function CategoriesPage() {
                   </Button>
                   
                   <AlertDialog>
-                    {/* AQUI ESTÁ A CORREÇÃO: Sem asChild, usando className direto no trigger */}
                     <AlertDialogTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-8 w-8 text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-4 w-4" />
                     </AlertDialogTrigger>

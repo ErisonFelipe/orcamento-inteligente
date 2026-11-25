@@ -12,18 +12,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
 import {
-  useInvestments,
-  useCreateBulkInvestment,
-  useUpdateInvestment,
-  useDeleteInvestment,
+  useInvestments, useCreateBulkInvestment, useUpdateInvestment, useDeleteInvestment,
 } from "@/hooks/use-investments"
 
 function evaluateMath(expression: string): string {
@@ -54,7 +46,7 @@ const investmentSchema = z.object({
 type InvestmentFormValues = z.infer<typeof investmentSchema>
 
 export function InvestmentsPage() {
-  const { data, isLoading } = useInvestments()
+  const { data, isLoading, isError } = useInvestments()
   const createBulkMutation = useCreateBulkInvestment()
   const updateMutation = useUpdateInvestment()
   const deleteMutation = useDeleteInvestment()
@@ -62,14 +54,13 @@ export function InvestmentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
 
-  // Modais de atualização de saldo
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [editingBalanceId, setEditingBalanceId] = useState<number | null>(null)
   const [newBalance, setNewBalance] = useState("")
 
-  const items = data?.items ?? []
+  // BLINDAGEM: Garante que items é um array
+  const items = Array.isArray(data?.items) ? data.items : []
 
-  // Calcula o valor total que já está em caixa (não alocado)
   const currentCash = useMemo(() => {
     return items
       .filter((inv) => inv.name === "Caixa (Não alocado)" || inv.type === "Caixa")
@@ -85,10 +76,7 @@ export function InvestmentsPage() {
     },
   })
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "allocations",
-  })
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "allocations" })
 
   const watchTotal = Number(evaluateMath(form.watch("totalAmount") || "0")) || 0
   const watchAllocations = form.watch("allocations") || []
@@ -97,28 +85,19 @@ export function InvestmentsPage() {
     return acc + (Number(evaluateMath(curr.amount || "0")) || 0)
   }, 0)
 
-  // O total disponível é o que está no caixa + o novo aporte
   const totalAvailable = currentCash + watchTotal
   const remainingCash = totalAvailable - totalAllocated
   const isOverAllocated = remainingCash < -0.01
 
   function openCreate() {
     setEditingId(null)
-    form.reset({ 
-      date: new Date().toISOString().slice(0, 10), 
-      totalAmount: "",
-      allocations: [{ name: "", type: "Ações", amount: "" }]
-    })
+    form.reset({ date: new Date().toISOString().slice(0, 10), totalAmount: "", allocations: [{ name: "", type: "Ações", amount: "" }] })
     setIsDialogOpen(true)
   }
 
   function openEdit(inv: any) {
     setEditingId(inv.id)
-    form.reset({ 
-      date: inv.date, 
-      totalAmount: inv.amount, 
-      allocations: [{ name: inv.name, type: inv.type, amount: inv.amount }]
-    })
+    form.reset({ date: inv.date, totalAmount: inv.amount, allocations: [{ name: inv.name, type: inv.type, amount: inv.amount }] })
     setIsDialogOpen(true)
   }
 
@@ -131,10 +110,7 @@ export function InvestmentsPage() {
   async function handleSaveBalance() {
     if (!editingBalanceId) return
     try {
-      await updateMutation.mutateAsync({
-        id: editingBalanceId,
-        payload: { current_value: Number(newBalance).toFixed(2) }
-      })
+      await updateMutation.mutateAsync({ id: editingBalanceId, payload: { current_value: Number(newBalance).toFixed(2) } })
       toast.success("Saldo do ativo atualizado!")
       setIsBalanceDialogOpen(false)
     } catch (err) {
@@ -144,7 +120,7 @@ export function InvestmentsPage() {
 
   async function onSubmit(values: InvestmentFormValues) {
     if (isOverAllocated) {
-      toast.error("A soma das alocações é maior que o valor disponível (Aporte + Caixa).")
+      toast.error("A soma das alocações é maior que o valor disponível.")
       return
     }
 
@@ -152,44 +128,23 @@ export function InvestmentsPage() {
       if (editingId) {
         await updateMutation.mutateAsync({ 
           id: editingId, 
-          payload: {
-            name: values.allocations[0].name,
-            type: values.allocations[0].type,
-            amount: evaluateMath(values.allocations[0].amount),
-            date: values.date
-          } 
+          payload: { name: values.allocations[0].name, type: values.allocations[0].type, amount: evaluateMath(values.allocations[0].amount), date: values.date } 
         })
         toast.success("Investimento atualizado")
       } else {
-        // 1. Encontra os registros antigos de caixa para deletar
-        const oldCashItems = items.filter(
-          (inv) => inv.name === "Caixa (Não alocado)" || inv.type === "Caixa"
-        )
-
-        // 2. Prepara os novos ativos
+        const oldCashItems = items.filter((inv) => inv.name === "Caixa (Não alocado)" || inv.type === "Caixa")
         const itemsToCreate = values.allocations.map(alloc => ({
-          name: alloc.name,
-          type: alloc.type,
-          amount: evaluateMath(alloc.amount),
-          date: values.date
+          name: alloc.name, type: alloc.type, amount: evaluateMath(alloc.amount), date: values.date
         }))
 
-        // 3. Se sobrou dinheiro no caixa, adiciona o novo registro de caixa
         if (remainingCash > 0.01) {
-          itemsToCreate.push({
-            name: "Caixa (Não alocado)",
-            type: "Caixa",
-            amount: remainingCash.toFixed(2),
-            date: values.date
-          })
+          itemsToCreate.push({ name: "Caixa (Não alocado)", type: "Caixa", amount: remainingCash.toFixed(2), date: values.date })
         }
 
-        // 4. Deleta os caixas antigos para não duplicar o dinheiro
         if (oldCashItems.length > 0) {
           await Promise.all(oldCashItems.map(inv => investmentsApi.delete(inv.id)))
         }
 
-        // 5. Cria os novos registros
         await createBulkMutation.mutateAsync({ items: itemsToCreate })
         toast.success(`Aporte de ${formatCurrency(values.totalAmount)} registrado`)
       }
@@ -210,6 +165,9 @@ export function InvestmentsPage() {
 
   const totalInvested = items.reduce((acc, item) => acc + Number(item.current_value || item.amount), 0)
 
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Carregando investimentos...</div>
+  if (isError) return <div className="p-8 text-center text-destructive">Erro ao carregar os investimentos. Verifique se o backend está rodando.</div>
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -217,38 +175,26 @@ export function InvestmentsPage() {
           <h2 className="text-lg font-semibold">Meus Investimentos</h2>
           <p className="text-sm text-muted-foreground">Acompanhe seus aportes e o caixa da corretora.</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Novo Aporte
-        </Button>
+        <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> Novo Aporte</Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-muted-foreground">Patrimônio em Investimentos</p>
-            <p className="text-2xl font-bold text-primary mt-2">
-              {formatCurrency(totalInvested.toString())}
-            </p>
+            <p className="text-2xl font-bold text-primary mt-2">{formatCurrency(totalInvested.toString())}</p>
           </CardContent>
         </Card>
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="p-6">
-            <p className="text-sm font-medium text-primary flex items-center gap-2">
-              <Wallet className="h-4 w-4" /> Caixa Disponível (Não Alocado)
-            </p>
-            <p className="text-2xl font-bold text-primary mt-2">
-              {formatCurrency(currentCash.toString())}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Este saldo pode ser usado no seu próximo aporte.
-            </p>
+            <p className="text-sm font-medium text-primary flex items-center gap-2"><Wallet className="h-4 w-4" /> Caixa Disponível (Não Alocado)</p>
+            <p className="text-2xl font-bold text-primary mt-2">{formatCurrency(currentCash.toString())}</p>
+            <p className="text-xs text-muted-foreground mt-1">Este saldo pode ser usado no seu próximo aporte.</p>
           </CardContent>
         </Card>
       </div>
 
-      {isLoading ? (
-        <p>Carregando...</p>
-      ) : items.length === 0 ? (
+      {items.length === 0 ? (
         <div className="text-center py-12 border border-dashed rounded-lg">
           <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-2 opacity-50" />
           <p className="text-muted-foreground">Nenhum investimento registrado.</p>
@@ -280,15 +226,9 @@ export function InvestmentsPage() {
                   </div>
 
                   <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openBalanceEdit(inv)}>
-                      Atualizar
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(inv)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(inv.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openBalanceEdit(inv)}>Atualizar</Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(inv)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(inv.id)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
               </div>
@@ -297,18 +237,15 @@ export function InvestmentsPage() {
         </div>
       )}
 
-      {/* MODAL DE NOVO APORTE */}
+      {/* MODAIS (Mantidos) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar Investimento" : "Novo Aporte"}</DialogTitle>
-            <DialogDescription>
-              {editingId ? "Altere os dados do ativo." : "Quanto você transferiu da conta corrente? Distribua abaixo."}
-            </DialogDescription>
+            <DialogDescription>{editingId ? "Altere os dados do ativo." : "Quanto você transferiu da conta corrente? Distribua abaixo."}</DialogDescription>
           </DialogHeader>
           
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data do Aporte</Label>
@@ -317,15 +254,7 @@ export function InvestmentsPage() {
               {!editingId && (
                 <div className="space-y-2">
                   <Label>Novo Valor Transferido (R$)</Label>
-                  <Input 
-                    placeholder="Ex: 100" 
-                    {...form.register("totalAmount", {
-                      onBlur: (e) => {
-                        const val = e.target.value
-                        if (val) form.setValue("totalAmount", evaluateMath(val), { shouldValidate: true })
-                      }
-                    })} 
-                  />
+                  <Input placeholder="Ex: 100" {...form.register("totalAmount", { onBlur: (e) => { const val = e.target.value; if (val) form.setValue("totalAmount", evaluateMath(val), { shouldValidate: true }) } })} />
                 </div>
               )}
             </div>
@@ -339,7 +268,7 @@ export function InvestmentsPage() {
 
             <div className="space-y-3 mt-4">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">Distribuição (Para onde foi o dinheiro?)</Label>
+                <Label className="text-sm font-semibold">Distribuição</Label>
                 {!editingId && (
                   <Button type="button" variant="outline" size="sm" onClick={() => append({ name: "", type: "Ações", amount: "" })}>
                     <Plus className="h-3 w-3 mr-1" /> Adicionar Ativo
@@ -359,20 +288,10 @@ export function InvestmentsPage() {
                   </div>
                   <div className="w-[100px] space-y-1">
                     <Label className="text-xs">Valor (R$)</Label>
-                    <Input 
-                      placeholder="0.00" 
-                      {...form.register(`allocations.${index}.amount`, {
-                        onBlur: (e) => {
-                          const val = e.target.value
-                          if (val) form.setValue(`allocations.${index}.amount`, evaluateMath(val), { shouldValidate: true })
-                        }
-                      })} 
-                    />
+                    <Input placeholder="0.00" {...form.register(`allocations.${index}.amount`, { onBlur: (e) => { const val = e.target.value; if (val) form.setValue(`allocations.${index}.amount`, evaluateMath(val), { shouldValidate: true }) } })} />
                   </div>
                   {fields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" className="text-destructive h-9 w-9 shrink-0" onClick={() => remove(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive h-9 w-9 shrink-0" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                   )}
                 </div>
               ))}
@@ -381,7 +300,7 @@ export function InvestmentsPage() {
             {!editingId && (
               <div className={`p-3 rounded-md text-sm ${isOverAllocated ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
                 <div className="flex justify-between font-medium">
-                  <span>Total Disponível (Aporte + Caixa):</span>
+                  <span>Total Disponível:</span>
                   <span>{formatCurrency(totalAvailable.toFixed(2))}</span>
                 </div>
                 <div className="flex justify-between font-medium mt-1">
@@ -406,32 +325,23 @@ export function InvestmentsPage() {
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={createBulkMutation.isPending || updateMutation.isPending || isOverAllocated}>
-                {createBulkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Salvar
+                {createBulkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Salvar
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE ATUALIZAR SALDO */}
       <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Atualizar Valor do Ativo</DialogTitle>
-            <DialogDescription>
-              Insira o valor de mercado atual. O aporte original não muda.
-            </DialogDescription>
+            <DialogDescription>Insira o valor de mercado atual. O aporte original não muda.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Novo Valor (R$)</Label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                value={newBalance} 
-                onChange={(e) => setNewBalance(e.target.value)} 
-              />
+              <Input type="number" step="0.01" value={newBalance} onChange={(e) => setNewBalance(e.target.value)} />
             </div>
           </div>
           <DialogFooter>

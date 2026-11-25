@@ -35,6 +35,9 @@ export function TransactionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const clearAllMutation = useClearAllTransactions()
 
+  // Estado para controlar o modal de excluir tudo
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false)
+
   const page = Number(searchParams.get("page")) || 1
   const type = (searchParams.get("type") as TransactionType | null) ?? undefined
   const category = searchParams.get("category") ?? undefined
@@ -121,8 +124,14 @@ export function TransactionsPage() {
 
   function handleClearAll() {
     clearAllMutation.mutate(undefined, {
-      onSuccess: () => toast.success("Todas as transações foram excluídas."),
-      onError: () => toast.error("Erro ao excluir as transações.")
+      onSuccess: () => {
+        toast.success("Todas as transações foram excluídas.")
+        setIsClearDialogOpen(false) // Fecha o modal após sucesso
+      },
+      onError: () => {
+        toast.error("Erro ao excluir as transações.")
+        setIsClearDialogOpen(false) // Fecha mesmo com erro para não travar a tela
+      }
     })
   }
 
@@ -130,7 +139,6 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO DA PÁGINA COM BOTÃO DE EXCLUIR TUDO */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="w-full sm:w-auto flex items-center gap-4">
           <MonthSelector 
@@ -139,8 +147,8 @@ export function TransactionsPage() {
             onChange={handleMonthChange} 
           />
           
-          <AlertDialog>
-            {/* CORREÇÃO AQUI: Removido asChild e aplicado classes do botão direto no trigger */}
+          {/* MODAL CONTROLADO PELO ESTADO */}
+          <AlertDialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
             <AlertDialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3 hidden sm:flex disabled:opacity-50">
               {clearAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               Excluir Tudo

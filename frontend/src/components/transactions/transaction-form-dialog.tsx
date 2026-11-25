@@ -61,12 +61,16 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   const createMutation = useCreateTransaction()
   const createBulkMutation = useCreateBulkTransaction()
   const updateMutation = useUpdateTransaction()
-  const { data: categories } = useCategories()
   
+  // BLINDAGEM AQUI: Garante que categories sempre será um array
+  const { data: rawCategories } = useCategories()
+  const categories = Array.isArray(rawCategories) ? rawCategories : []
+
   const isSubmitting = createMutation.isPending || updateMutation.isPending || createBulkMutation.isPending
 
-  const [installmentsStr, setInstallmentsStr] = useState("1")
-  const installments = Number(installmentsStr) || 1
+  // Estados separados para Despesa e Receita
+  const [expenseInstallments, setExpenseInstallments] = useState("1")
+  const [incomeInstallments, setIncomeInstallments] = useState("1")
 
   const [isPredicting, setIsPredicting] = useState(false)
   const [aiSuggested, setAiSuggested] = useState<number | null>(null)
@@ -86,7 +90,8 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
     if (open) {
       form.reset(transaction ? valuesFromTransaction(transaction) : EMPTY_VALUES)
       setAiSuggested(null)
-      setInstallmentsStr("1")
+      setExpenseInstallments("1")
+      setIncomeInstallments("1")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transaction])
@@ -109,29 +114,27 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   async function onSubmit(values: TransactionFormValues) {
     const calculatedAmount = evaluateMath(values.amount)
     const finalValues = { ...values, amount: calculatedAmount }
+    
+    const repetitions = type === "expense" ? Number(expenseInstallments) || 1 : Number(incomeInstallments) || 1
 
     try {
       if (transaction) {
         await updateMutation.mutateAsync({ id: transaction.id, payload: toUpdatePayload(finalValues) })
         toast.success("Transação atualizada", { description: finalValues.description })
-      } else if (installments > 1) {
+      } else if (repetitions > 1) {
         const basePayload = toCreatePayload(finalValues)
         const totalValue = Number(basePayload.amount)
         const isExpense = type === "expense"
 
-        // Lógica à prova de falhas:
-        // Se for Despesa: divide o total.
-        // Se for Receita: mantém o valor cheio.
         const valuePerItem = isExpense 
-          ? Number((totalValue / installments).toFixed(2))
+          ? Number((totalValue / repetitions).toFixed(2))
           : totalValue
 
-        const items = Array.from({ length: installments }).map((_, index) => {
+        const items = Array.from({ length: repetitions }).map((_, index) => {
           let finalItemAmount = valuePerItem
 
-          // Ajuste de centavos na última parcela apenas se for despesa
-          if (isExpense && index === installments - 1) {
-            const sumOfPrevious = valuePerItem * (installments - 1)
+          if (isExpense && index === repetitions - 1) {
+            const sumOfPrevious = valuePerItem * (repetitions - 1)
             finalItemAmount = Number((totalValue - sumOfPrevious).toFixed(2))
           }
 
@@ -139,12 +142,14 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
             ...basePayload,
             amount: finalItemAmount.toFixed(2),
             date: addMonths(basePayload.date, index),
-            description: `${finalValues.description} (${index + 1}/${installments})`
+            description: isExpense 
+              ? `${finalValues.description} (${index + 1}/${repetitions})`
+              : `${finalValues.description} (${index + 1}/${repetitions})`
           }
         })
 
         await createBulkMutation.mutateAsync({ items })
-        toast.success(`${installments} transações criadas`, { description: finalValues.description })
+        toast.success(`${repetitions} transações criadas`, { description: finalValues.description })
       } else {
         await createMutation.mutateAsync(toCreatePayload(finalValues))
         toast.success("Transação criada", { description: finalValues.description })
@@ -156,10 +161,11 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
   }
 
   const calculatedPreviewAmount = Number(evaluateMath(amount)) || 0
-  const isExpensePreview = type === "expense"
+  const isExpense = type === "expense"
+  const currentRepetitions = isExpense ? (Number(expenseInstallments) || 1) : (Number(incomeInstallments) || 1)
   
-  const displayAmount = isExpensePreview 
-    ? calculatedPreviewAmount / installments 
+  const displayAmount = isExpense 
+    ? calculatedPreviewAmount / currentRepetitions 
     : calculatedPreviewAmount
 
   return (
@@ -200,7 +206,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">
-                {isExpensePreview && installments > 1 ? "Valor Total (R$)" : "Valor (R$)"}
+                {isExpense && currentRepetitions > 1 ? "Valor Total (R$)" : "Valor (R$)"}
               </Label>
               <Input 
                 id="amount" 
@@ -229,34 +235,63 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
             </div>
           </div>
 
-          {!isEdit && (
+          {/* CAMPO EXCLUSIVO PARA DESPESA */}
+          {!isEdit && isExpense && (
             <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border">
-              <Label htmlFor="installments" className="text-sm font-semibold">
-                {isExpensePreview ? "Parcelar em quantas vezes?" : "Repetir por quantos meses?"}
+              <Label htmlFor="expense_installments" className="text-sm font-semibold">
+                Parcelar em quantas vezes?
               </Label>
               <div className="flex items-center gap-2">
                 <Input
-                  id="installments"
+                  id="expense_installments"
                   type="number"
                   min={1}
                   max={48}
                   className="w-24"
-                  value={installmentsStr}
-                  onChange={(e) => setInstallmentsStr(e.target.value)}
+                  value={expenseInstallments}
+                  onChange={(e) => setExpenseInstallments(e.target.value)}
                   onBlur={() => {
-                    const num = Number(installmentsStr)
-                    if (isNaN(num) || num < 1) setInstallmentsStr("1")
-                    else if (num > 48) setInstallmentsStr("48")
+                    const num = Number(expenseInstallments)
+                    if (isNaN(num) || num < 1) setExpenseInstallments("1")
+                    else if (num > 48) setExpenseInstallments("48")
                   }}
                 />
-                <span className="text-sm text-muted-foreground">
-                  {isExpensePreview ? "parcelas" : "meses"}
-                </span>
+                <span className="text-sm text-muted-foreground">parcelas</span>
               </div>
-              {installments > 1 && (
+              {currentRepetitions > 1 && (
                 <p className="text-xs text-primary mt-1">
-                  Serão criadas {installments} transações de {formatCurrency(displayAmount.toFixed(2))}.
-                  {!isExpensePreview && ` (Total: ${formatCurrency((calculatedPreviewAmount * installments).toFixed(2))})`}
+                  Serão criadas {currentRepetitions} parcelas de {formatCurrency(displayAmount.toFixed(2))}.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* CAMPO EXCLUSIVO PARA RECEITA */}
+          {!isEdit && !isExpense && (
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border">
+              <Label htmlFor="income_installments" className="text-sm font-semibold">
+                Repetir por quantos meses?
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="income_installments"
+                  type="number"
+                  min={1}
+                  max={48}
+                  className="w-24"
+                  value={incomeInstallments}
+                  onChange={(e) => setIncomeInstallments(e.target.value)}
+                  onBlur={() => {
+                    const num = Number(incomeInstallments)
+                    if (isNaN(num) || num < 1) setIncomeInstallments("1")
+                    else if (num > 48) setIncomeInstallments("48")
+                  }}
+                />
+                <span className="text-sm text-muted-foreground">meses</span>
+              </div>
+              {currentRepetitions > 1 && (
+                <p className="text-xs text-primary mt-1">
+                  Serão criadas {currentRepetitions} receitas de {formatCurrency(displayAmount.toFixed(2))}.
                 </p>
               )}
             </div>
@@ -276,7 +311,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction }: Trans
                   <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem categoria</SelectItem>
-                    {categories?.map((cat) => (
+                    {categories.map((cat) => (
                       <SelectItem key={cat.id} value={String(cat.id)}>
                         <div className="flex items-center gap-2">
                           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />

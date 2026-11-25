@@ -38,36 +38,38 @@ export function DashboardPage() {
   }
 
   if (isError || !data) {
-    return <div className="p-8 text-center text-destructive">Erro ao carregar o dashboard.</div>
+    return <div className="p-8 text-center text-destructive">Erro ao carregar o dashboard. Verifique se o backend está rodando.</div>
   }
 
-  const pieData = data.expenses_by_category.map((item) => ({
+  // BLINDAGEM: Garante que é um array
+  const pieData = Array.isArray(data.expenses_by_category) ? data.expenses_by_category.map((item) => ({
     name: item.name, total: Number(item.total), fill: item.color,
-  }))
+  })) : []
+  
   const pieConfig = pieData.reduce((acc, item) => { acc[item.name] = { label: item.name, color: item.fill }; return acc }, {} as ChartConfig)
   const hasExpenses = pieData.length > 0
 
-  const barData = data.monthly_summary.map((item) => ({
+  const barData = Array.isArray(data.monthly_summary) ? data.monthly_summary.map((item) => ({
     month: formatMonthLabel(item.month), income: Number(item.income), expense: Number(item.expense),
-  }))
+  })) : []
+  
   const barConfig = {
     income: { label: "Receitas", color: "var(--income)" },
     expense: { label: "Despesas", color: "var(--expense)" },
   } satisfies ChartConfig
   const hasMonths = barData.length > 0
 
-  // Dados do Fluxo de Caixa Futuro
-  const cashflowData = cashflow?.forecast.map(item => ({
+  const cashflowData = Array.isArray(cashflow?.forecast) ? cashflow.forecast.map(item => ({
     month: formatMonthLabel(item.month),
     balance: Number(item.balance)
-  })) || []
+  })) : []
 
   const cashflowConfig = {
     balance: { label: "Saldo Projetado", color: "var(--primary)" },
   } satisfies ChartConfig
 
-  const totalIncome = data.monthly_summary.reduce((acc, curr) => acc + Number(curr.income), 0)
-  const totalExpense = data.monthly_summary.reduce((acc, curr) => acc + Number(curr.expense), 0)
+  const totalIncome = Array.isArray(data.monthly_summary) ? data.monthly_summary.reduce((acc, curr) => acc + Number(curr.income), 0) : 0
+  const totalExpense = Array.isArray(data.monthly_summary) ? data.monthly_summary.reduce((acc, curr) => acc + Number(curr.expense), 0) : 0
   const forecast = data.forecast
 
   return (
@@ -86,17 +88,13 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* NOVO GRÁFICO: FLUXO DE CAIXA FUTURO */}
       {cashflowData.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Previsão de Fluxo de Caixa
+              <Activity className="h-5 w-5 text-primary" /> Previsão de Fluxo de Caixa
             </CardTitle>
-            <CardDescription>
-              Seu saldo projetado para os próximos 6 meses (incluindo contas já agendadas).
-            </CardDescription>
+            <CardDescription>Seu saldo projetado para os próximos 6 meses.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] w-full mt-4">
@@ -112,13 +110,7 @@ export function DashboardPage() {
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(val) => `R$ ${val}`} />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="balance" 
-                    stroke="var(--color-balance)" 
-                    fill="url(#fillBalance)" 
-                    strokeWidth={2}
-                  />
+                  <Area type="monotone" dataKey="balance" stroke="var(--color-balance)" fill="url(#fillBalance)" strokeWidth={2} />
                 </AreaChart>
               </ChartContainer>
             </div>
