@@ -49,3 +49,17 @@ export interface CashflowForecast {
   current_balance: string;
   forecast: CashflowMonth[];
 }
+
+export interface ProjectionMonth {
+  month: string;
+  projected_balance: string;
+  projected_income: string;
+  projected_expense: string;
+  alert_message: string | null;
+}
+
+export interface ProjectionResponse {
+  current_balance: string;
+  average_monthly_net: string;
+  projection: ProjectionMonth[];
+}

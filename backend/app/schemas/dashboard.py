@@ -35,28 +35,38 @@ class DashboardSummary(BaseModel):
     total_invested: Decimal
 
 
-# --- NOVOS SCHEMAS PARA PATRIMÔNIO ANUAL ---
-
 class AnnualWealthSummary(BaseModel):
-    """Resumo macro do patrimônio no ano selecionado."""
     year: int
     total_income: Decimal
     total_expense: Decimal
-    
-    current_cash: Decimal      # NOVO: Dinheiro em conta hoje
-    projected_cash: Decimal    # NOVO: Dinheiro em conta no fim do ano
-    
+    current_cash: Decimal
+    projected_cash: Decimal
     total_invested: Decimal
-    net_worth: Decimal         # Patrimônio Líquido HOJE
-    
+    net_worth: Decimal
     projected_annual_income: Decimal
     projected_annual_expense: Decimal
     projected_annual_savings: Decimal
-    
+
+
 class CashflowMonth(BaseModel):
-    month: str  # Formato "YYYY-MM"
-    balance: Decimal # Saldo projetado ao final do mês
+    month: str
+    balance: Decimal
+
 
 class CashflowForecast(BaseModel):
     current_balance: Decimal
     forecast: list[CashflowMonth]
+
+
+class ProjectionMonth(BaseModel):
+    month: str
+    projected_balance: Decimal
+    projected_income: Decimal
+    projected_expense: Decimal
+    alert_message: str | None = None
+
+
+class ProjectionResponse(BaseModel):
+    current_balance: Decimal
+    average_monthly_net: Decimal
+    projection: list[ProjectionMonth]
