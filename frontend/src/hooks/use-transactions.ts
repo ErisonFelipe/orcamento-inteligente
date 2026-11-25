@@ -73,3 +73,15 @@ export function useCreateBulkTransaction() {
     },
   })
 }
+
+export function useClearAllTransactions() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => transactionsApi.clearAll(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["investments"] })
+    },
+  })
+}

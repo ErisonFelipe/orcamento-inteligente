@@ -105,6 +105,20 @@ def list_transactions(
         total_income=total_income,
         total_expense=total_expense
     )
+    
+@router.delete(
+    "/clear-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Apagar TODAS as transações",
+)
+def clear_all_transactions(
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    """
+    Remove permanentemente todas as transações do banco de dados.
+    Use com cuidado! Esta ação não pode ser desfeita.
+    """
+    crud_transaction.clear_all(db)
 
 
 # ---------------------------------------------------------------------------

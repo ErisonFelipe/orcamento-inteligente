@@ -122,6 +122,10 @@ export const transactionsApi = {
     const response = await api.post<TransactionRead[]>("/transactions/bulk", payload)
     return response.data
   },
+
+  async clearAll(): Promise<void> {
+    await api.delete("/transactions/clear-all")
+  },
 }
 
 // ============================================================

@@ -114,3 +114,8 @@ def create_bulk(db: Session, obj_in: list[TransactionCreate]) -> list[Transactio
         db.refresh(obj)
         
     return db_objs
+
+def clear_all(db: Session) -> None:
+    """Deleta todas as transações do banco de dados."""
+    db.query(Transaction).delete()
+    db.commit()
