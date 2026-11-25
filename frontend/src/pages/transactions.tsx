@@ -16,7 +16,6 @@ import {
   TransactionsListSkeleton,
   TransactionsSummarySkeleton,
 } from "@/components/transactions/transactions-states"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -141,11 +140,10 @@ export function TransactionsPage() {
           />
           
           <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="gap-2 hidden sm:flex" disabled={clearAllMutation.isPending}>
-                {clearAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Excluir Tudo
-              </Button>
+            {/* CORREÇÃO AQUI: Removido asChild e aplicado classes do botão direto no trigger */}
+            <AlertDialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3 hidden sm:flex disabled:opacity-50">
+              {clearAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Excluir Tudo
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
