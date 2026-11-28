@@ -6,7 +6,8 @@ export const dashboardKeys = {
   summary: (month?: number, year?: number) => [...dashboardKeys.all, "summary", month, year] as const,
   wealth: (year: number) => [...dashboardKeys.all, "wealth", year] as const,
   cashflow: (months: number) => [...dashboardKeys.all, "cashflow", months] as const,
-  projection: () => [...dashboardKeys.all, "projection"] as const, // <-- Nova chave
+  projection: () => [...dashboardKeys.all, "projection"] as const,
+  recurring: () => [...dashboardKeys.all, "recurring"] as const,
 }
 
 export function useDashboardSummary(month?: number, year?: number) {
@@ -34,5 +35,12 @@ export function useFinancialProjection() {
   return useQuery({
     queryKey: dashboardKeys.projection(),
     queryFn: () => dashboardApi.getProjection(),
+  })
+}
+
+export function useRecurringExpenses() {
+  return useQuery({
+    queryKey: dashboardKeys.recurring(),
+    queryFn: () => dashboardApi.getRecurringExpenses(),
   })
 }

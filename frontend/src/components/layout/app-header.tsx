@@ -23,6 +23,14 @@ const PAGES: Record<string, PageInfo> = {
     title: "Transações",
     subtitle: "Gerencie suas receitas e despesas",
   },
+  "/calendar": { 
+    title: "Calendário", 
+    subtitle: "Visão diária das suas finanças" 
+  },
+  "/investments": { 
+    title: "Investimentos", 
+    subtitle: "Seus aportes e patrimônio" 
+  },
   "/dashboard": {
     title: "Dashboard",
     subtitle: "Visão geral das suas finanças",

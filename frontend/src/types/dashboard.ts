@@ -63,3 +63,17 @@ export interface ProjectionResponse {
   average_monthly_net: string;
   projection: ProjectionMonth[];
 }
+
+export interface RecurringExpense {
+  description: string;
+  average_amount: string;
+  category_name: string | null;
+  category_color: string | null;
+  next_estimated_date: string;
+  months_detected: number;
+}
+
+export interface RecurringExpensesResponse {
+  total_monthly: string;
+  expenses: RecurringExpense[];
+}

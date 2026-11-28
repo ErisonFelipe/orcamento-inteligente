@@ -7,6 +7,7 @@ import { SettingsPage } from "@/pages/settings"
 import { TransactionsPage } from "@/pages/transactions"
 import { InvestmentsPage } from "@/pages/investments"
 import { WealthPage } from "@/pages/wealth"
+import { CalendarPage } from "@/pages/calendar"
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/transactions" replace />} />
         <Route path="/transactions" element={<TransactionsPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/investments" element={<InvestmentsPage />} />
         <Route path="/wealth" element={<WealthPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />

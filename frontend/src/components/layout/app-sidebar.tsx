@@ -8,6 +8,7 @@ import {
   Landmark,
 } from "lucide-react"
 import { NavLink } from "react-router-dom"
+import { CalendarDays } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -19,6 +20,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Transações", to: "/transactions", icon: ArrowLeftRight },
+  { label: "Calendário", to: "/calendar", icon: CalendarDays },
   { label: "Investimentos", to: "/investments", icon: TrendingUp },
   { label: "Patrimônio", to: "/wealth", icon: Landmark },
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },

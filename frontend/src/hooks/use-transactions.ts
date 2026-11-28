@@ -15,6 +15,7 @@ export const transactionKeys = {
     [...transactionKeys.lists(), filters] as const,
   details: () => [...transactionKeys.all, "detail"] as const,
   detail: (id: number) => [...transactionKeys.details(), id] as const,
+    calendar: (month: number, year: number) => [...transactionKeys.all, "calendar", month, year] as const,
 }
 
 export function useTransactions(filters: TransactionFilters = {}) {
@@ -83,5 +84,12 @@ export function useClearAllTransactions() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["investments"] })
     },
+  })
+}
+
+export function useCalendarTransactions(month: number, year: number) {
+  return useQuery({
+    queryKey: transactionKeys.calendar(month, year),
+    queryFn: () => transactionsApi.getCalendar(month, year),
   })
 }

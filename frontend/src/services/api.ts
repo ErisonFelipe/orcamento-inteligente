@@ -14,7 +14,7 @@ import type {
   CategoryRead,
   CategoryUpdate,
 } from "@/types/category"
-import type { DashboardSummary, AnnualWealthSummary, CashflowForecast, ProjectionResponse } from "@/types/dashboard"
+import type { DashboardSummary, AnnualWealthSummary, CashflowForecast, ProjectionResponse, RecurringExpensesResponse } from "@/types/dashboard"
 import type { InvestmentCreate, InvestmentListResult, InvestmentRead, InvestmentUpdate, InvestmentBulkCreate } from "@/types/investment"
 
 const API_BASE_URL = "/api/v1"
@@ -126,6 +126,13 @@ export const transactionsApi = {
   async clearAll(): Promise<void> {
     await api.delete("/transactions/clear-all")
   },
+
+  async getCalendar(month: number, year: number): Promise<TransactionRead[]> {
+    const response = await api.get<TransactionRead[]>("/transactions/calendar", {
+      params: { month, year }
+    })
+    return response.data
+  },
 }
 
 // ============================================================
@@ -185,8 +192,13 @@ export const dashboardApi = {
     return response.data
   },
 
-    async getProjection(): Promise<ProjectionResponse> {
+  async getProjection(): Promise<ProjectionResponse> {
     const response = await api.get<ProjectionResponse>("/dashboard/projection")
+    return response.data
+  },
+
+  async getRecurringExpenses(): Promise<RecurringExpensesResponse> {
+    const response = await api.get<RecurringExpensesResponse>("/dashboard/recurring-expenses")
     return response.data
   },
 }
